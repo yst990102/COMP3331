@@ -37,7 +37,7 @@ serverSocket.bind(serverAddress)
 
 # User Data
 UserData = LoadUserData('credentials.txt')
-OnLine_list = {}
+OnLine_list = []
 if debug : print(UserData)
 
 
@@ -81,19 +81,15 @@ class ClientThread(Thread):
                 if self.process_login() == False:
                     continue
 
-                login_info = {self.username:datetime.datetime.now()}
+                login_info = (self.username, datetime.datetime.now())
                 # add user to the global online list
-                OnLine_list.update(login_info)
+                OnLine_list.append(login_info)
                 
                 print("[check] Successfully Login! Time - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))    # print login finished & time 
                 login_success_message = ServerReply("Welcome to the greatest messaging application ever!", ServerReplyType.ANNONCEMENT)
                 self.clientSocket.send(pickle.dumps(login_success_message))
-                break
-            
-            # if the message from client is empty, the client would be off-line then set the client as offline (alive=Flase)
-            if self.message == '':
-                self.clientAlive = False
-                print("===== the user disconnected - ", clientAddress)
+            elif self.message_type == MessageType.LOGOUT:
+                self.process_logout()
                 break
     
     """
@@ -140,11 +136,22 @@ class ClientThread(Thread):
         print("[recv] password = %s" %self.passwd)
         if UserData[self.username] == self.passwd:
             print("[check] Password Correct.")
+            return True
         else:
             print("[check] Invalid Password. Please Re-type Password.")
             passwd_request = ServerReply("Invalid Password. Please try again.", ServerReplyType.REQUEST_NEEDPASSWORD)
             self.clientSocket.send(pickle.dumps(passwd_request))
-            
+            return False
+        
+    def process_logout(self):
+        # get logout message, print diconnected announcement
+        self.clientAlive = False
+        print("===== the user disconnected - ", self.clientAddress)
+        # remove user from online list
+        for user in OnLine_list[:]:
+            if user[0] == self.username:
+                OnLine_list.remove(user)
+        return
 
 print("\n===== Server is running =====")
 print("===== Waiting for connection request from clients...=====")

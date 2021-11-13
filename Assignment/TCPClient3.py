@@ -55,29 +55,9 @@ while True:
 while True:
     message = input("===== Please type any messsage you want to send to server: =====\n")
     if message == "logout":
+        logout_message = Message("", MessageType.LOGOUT)
+        clientSocket.sendall(pickle.dumps(logout_message))
         print("Log out successfullly.")
-        break
-    clientSocket.sendall(message.encode())
-
-    # receive response from the server
-    # 1024 is a suggested packet size, you can specify it as 2048 or others
-    data = clientSocket.recv(1024)
-    receivedMessage = data.decode()
-
-    # parse the message received from server and take corresponding actions
-    if receivedMessage == "":
-        print("[recv] Message from server is empty!")
-    elif receivedMessage == "user credentials request":
-        print("[recv] You need to provide username and password to login")
-    elif receivedMessage == "download filename":
-        print("[recv] You need to provide the file name you want to download")
-    else:
-        print("[recv] Message makes no sense")
-        
-    ans = input('\nDo you want to continue(y/n) :')
-    if ans == 'y':
-        continue
-    else:
         break
 
 # close the socket
