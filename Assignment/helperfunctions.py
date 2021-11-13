@@ -1,24 +1,18 @@
 def LoadUserData(filename):
     UserDataFile = open(filename, 'r')
-    UserData = []
+    UserData = {}
     for DataLine in UserDataFile:
         [username, password] = DataLine.split(" ")
-        UserData.append({username:password})
-    print(UserData)
+        password = password.replace('\n', '')
+        UserData.update({username:password})
     UserDataFile.close()
     return UserData
 
-def CheckUserNameWithPassword(username, password):
-    credential = open('credentials.txt','r')
-    try:
-        for line in credential:
-            print(line)
-    finally:
-        credential.close()
+def AddUserDataToTXT(filename, userdata):
+    UserDataFile = open(filename, 'a')
+    UserDataFile.write(userdata['username'] + " " + userdata['password'] + "\n")
+    UserDataFile.close()
     return
-
-def MessageFormatChecker(message, message_type):
-    
 
 if __name__ == '__main__':
     LoadUserData('credentials1.txt')

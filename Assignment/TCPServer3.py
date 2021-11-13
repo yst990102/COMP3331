@@ -8,10 +8,20 @@
 """
 from socket import *
 from threading import Thread
-import sys, select
+import sys, select, pickle, datetime
+
+
+
+from Message import MessageType, ServerReply, ServerReplyType
+from helperfunctions import AddUserDataToTXT, LoadUserData
+
+# debug
+debug = 0
+
 
 # acquire server host and port from command line parameter
-if len(sys.argv) != 3:
+if len(sys.argv) != 4:
+    print(len(sys.argv))
     print("\n===== Error usage. Please follow format: (python3 TCPserver3.py server_port block_duration timeout) ======\n")
     exit(0)
 serverHost = "127.0.0.1"
@@ -24,6 +34,12 @@ serverAddress = (serverHost, serverPort)
 # define socket for the server side and bind address
 serverSocket = socket(AF_INET, SOCK_STREAM)
 serverSocket.bind(serverAddress)
+
+# User Data
+UserData = LoadUserData('credentials.txt')
+OnLine_list = {}
+if debug : print(UserData)
+
 
 """
     Define multi-thread class for client
@@ -40,37 +56,45 @@ class ClientThread(Thread):
         self.clientSocket = clientSocket
         self.clientAlive = False
         
+        self.block_duration = block_duration
+        self.timeout = timeout
+        
         print("===== New connection created for: ", clientAddress)
         self.clientAlive = True
         
     def run(self):
-        message = ''
+        self.message = ''
         
         while self.clientAlive:
             # use recv() to receive message from the client
             data = self.clientSocket.recv(1024)
-            message = data.decode()
+            self.message = pickle.loads(data)
+            
+            self.message_content = self.message.getContent()
+            self.message_type = self.message.getType()
+            
+            if debug : print(self.message_content)
+            if debug : print(self.message_type)
+            if debug : print()
+            
+            if self.message_type == MessageType.LOGIN:
+                if self.process_login() == False:
+                    continue
+
+                login_info = {self.username:datetime.datetime.now()}
+                # add user to the global online list
+                OnLine_list.update(login_info)
+                
+                print("[check] Successfully Login! Time - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))    # print login finished & time 
+                login_success_message = ServerReply("Welcome to the greatest messaging application ever!", ServerReplyType.ANNONCEMENT)
+                self.clientSocket.send(pickle.dumps(login_success_message))
+                break
             
             # if the message from client is empty, the client would be off-line then set the client as offline (alive=Flase)
-            if message == '':
+            if self.message == '':
                 self.clientAlive = False
                 print("===== the user disconnected - ", clientAddress)
                 break
-            
-            # handle message from the client
-            if message == 'login':
-                print("[recv] New login request")
-                self.process_login()
-            elif message == 'download':
-                print("[recv] Download request")
-                message = 'download filename'
-                print("[send] " + message)
-                self.clientSocket.send(message.encode())
-            else:
-                print("[recv] " + message)
-                print("[send] Cannot understand this message")
-                message = 'Cannot understand this message'
-                self.clientSocket.send(message.encode())
     
     """
         You can create more customized APIs here, e.g., logic for processing user authentication
@@ -80,10 +104,47 @@ class ClientThread(Thread):
             self.clientSocket.send(message.encode())
     """
     def process_login(self):
-        message = 'user credentials request'
-        print('[send] ' + message);
-        self.clientSocket.send(message.encode())
-
+        if 'username' in self.message_content.keys():
+            self.process_login_username()
+            return False
+        elif 'password' in self.message_content.keys():
+            return self.process_login_olduser()
+        elif 'newpassword' in self.message_content.keys():
+            self.process_login_newuser()
+        return True
+        
+    def process_login_username(self):
+        self.username = self.message_content['username']
+        # check if username in credential txt
+        if self.username in UserData.keys():
+            print("[recv] User already exists!! Check password!!")
+            # request for password checking
+            passwd_request = ServerReply("", ServerReplyType.REQUEST_NEEDPASSWORD)
+            self.clientSocket.send(pickle.dumps(passwd_request))
+        else:
+            print("[recv] New User, please create password!")
+            # request for new password
+            passwd_request = ServerReply("This is a new user.", ServerReplyType.REQUEST_NEWUSER)
+            self.clientSocket.send(pickle.dumps(passwd_request))
+            
+    def process_login_newuser(self):
+        self.passwd = self.message.getContent()['newpassword']
+        print("[recv] new password = %s" %self.passwd)
+        # add new user data into USERDATA and TXT
+        AddUserDataToTXT('credentials.txt', {"username":self.username, "password":self.passwd})
+        UserData.update({"username":self.username, "password":self.passwd})
+        print("[check] New User Added. Successfully Login!")
+        
+    def process_login_olduser(self):
+        self.passwd = self.message.getContent()['password']
+        print("[recv] password = %s" %self.passwd)
+        if UserData[self.username] == self.passwd:
+            print("[check] Password Correct.")
+        else:
+            print("[check] Invalid Password. Please Re-type Password.")
+            passwd_request = ServerReply("Invalid Password. Please try again.", ServerReplyType.REQUEST_NEEDPASSWORD)
+            self.clientSocket.send(pickle.dumps(passwd_request))
+            
 
 print("\n===== Server is running =====")
 print("===== Waiting for connection request from clients...=====")

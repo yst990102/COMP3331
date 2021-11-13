@@ -7,8 +7,9 @@
 """
 from socket import *
 import sys
+import pickle
 
-from types import Message, MessageType
+from Message import Message, MessageType, ServerReplyType
 
 # debug switch
 debug = 1
@@ -28,12 +29,28 @@ clientSocket = socket(AF_INET, SOCK_STREAM)
 clientSocket.connect(serverAddress)
 
 # input user name and password for validation
+username = input("Username: ")
+username_message = Message({"username":username}, MessageType.LOGIN)
+clientSocket.sendall(pickle.dumps(username_message))                    # send out username
+
 while True:
-    username = input("Username: ")
-    password = input("Password: ")
-    login_message_content = {"username":username, "password":password}
-    login_message = Message(login_message_content, MessageType.LOGIN)
-    if debug : print(login_message)
+    
+    # receive the check info from server
+    data = clientSocket.recv(1024)
+    receivedMessage = pickle.loads(data)
+    
+    if receivedMessage.getType() == ServerReplyType.REQUEST_NEEDPASSWORD:
+        password = input(receivedMessage.getContent() + "Password: ")
+        password_message = Message({"password":password}, MessageType.LOGIN)
+        clientSocket.sendall(pickle.dumps(password_message))                    # send out password
+    elif receivedMessage.getType() == ServerReplyType.REQUEST_NEWUSER:
+        password = input(receivedMessage.getContent() + "Enter a password: ")
+        password_message = Message({"newpassword":password}, MessageType.LOGIN)
+        clientSocket.sendall(pickle.dumps(password_message))                    # send out password
+    elif receivedMessage.getType() == ServerReplyType.ANNONCEMENT:
+        # print the login success message from server
+        print(receivedMessage.getContent())
+        break
 
 while True:
     message = input("===== Please type any messsage you want to send to server: =====\n")
