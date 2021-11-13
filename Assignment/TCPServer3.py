@@ -111,6 +111,10 @@ class ClientThread(Thread):
         
     def process_login_username(self):
         self.username = self.message_content['username']
+        
+        # refresh the user data before check user
+        UserData = LoadUserData('credentials.txt')
+        
         # check if username in credential txt
         if self.username in UserData.keys():
             print("[recv] User already exists!! Check password!!")
@@ -126,6 +130,7 @@ class ClientThread(Thread):
     def process_login_newuser(self):
         self.passwd = self.message.getContent()['newpassword']
         print("[recv] new password = %s" %self.passwd)
+        
         # add new user data into USERDATA and TXT
         AddUserDataToTXT('credentials.txt', {"username":self.username, "password":self.passwd})
         UserData.update({"username":self.username, "password":self.passwd})
@@ -133,6 +138,10 @@ class ClientThread(Thread):
         
     def process_login_olduser(self):
         self.passwd = self.message.getContent()['password']
+        
+        # refresh the user data before check password
+        UserData = LoadUserData('credentials.txt')
+        
         print("[recv] password = %s" %self.passwd)
         if UserData[self.username] == self.passwd:
             print("[check] Password Correct.")
@@ -151,6 +160,7 @@ class ClientThread(Thread):
         for user in OnLine_list[:]:
             if user[0] == self.username:
                 OnLine_list.remove(user)
+        # broadcast logout message to all unblocked user
         return
 
 print("\n===== Server is running =====")
