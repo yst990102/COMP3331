@@ -37,8 +37,11 @@ serverSocket.bind(serverAddress)
 
 # User Data
 UserData = LoadUserData('credentials.txt')
-OnLine_list = []
 if debug : print(UserData)
+
+OnLine_list = []
+
+clientThread_list = []
 
 
 """
@@ -88,6 +91,17 @@ class ClientThread(Thread):
                 print("[check] Successfully Login! Time - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))    # print login finished & time 
                 login_success_message = ServerReply("Welcome to the greatest messaging application ever!", ServerReplyType.ANNONCEMENT)
                 self.clientSocket.send(pickle.dumps(login_success_message))
+            elif self.message_type == MessageType.BROADCAST:
+                self.process_broadcast()
+                continue
+            elif self.message_type == MessageType.WHOELSE:
+                continue
+            elif self.message_type == MessageType.WHOELSESINCE:
+                continue
+            elif self.message_type == MessageType.BLOCK:
+                continue
+            elif self.message_type == MessageType.UNBLOCK:
+                continue
             elif self.message_type == MessageType.LOGOUT:
                 self.process_logout()
                 break
@@ -152,6 +166,15 @@ class ClientThread(Thread):
             self.clientSocket.send(pickle.dumps(passwd_request))
             return False
         
+        
+    def process_broadcast(self):
+        for thread in clientThread_list:
+            if thread.username != self.username:
+                broadcast_message_content = "[broadcast] " + self.username + ": "+ self.message_content["message"]
+                broadcast_message = ServerReply(broadcast_message_content, ServerReplyType.ANNONCEMENT)
+                thread.clientSocket.send(pickle.dumps(broadcast_message))
+        return
+    
     def process_logout(self):
         # get logout message, print diconnected announcement
         self.clientAlive = False
@@ -171,4 +194,6 @@ while True:
     serverSocket.listen()
     clientSockt, clientAddress = serverSocket.accept()
     clientThread = ClientThread(clientAddress, clientSockt)
+    # add the new thread to thread_list
+    clientThread_list.append(clientThread)
     clientThread.start()

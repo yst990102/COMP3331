@@ -8,6 +8,7 @@
 from socket import *
 import sys
 import pickle
+from ClientThread import ReceiveThread, SendThread
 
 from Message import Message, MessageType, ServerReplyType
 
@@ -52,13 +53,14 @@ while True:
         print(receivedMessage.getContent())
         break
 
-while True:
-    message = input("===== Please type any messsage you want to send to server: =====\n")
-    if message == "logout":
-        logout_message = Message("", MessageType.LOGOUT)
-        clientSocket.sendall(pickle.dumps(logout_message))
-        print("Log out successfullly.")
-        break
 
-# close the socket
-clientSocket.close()
+receivethread = ReceiveThread(clientSocket)
+sendthread = SendThread(clientSocket)
+receivethread.start()
+sendthread.start()
+
+if sendthread.Alive == False:
+    print("have to close socket now")
+    # close the socket
+    clientSocket.close()
+    exit(0)
