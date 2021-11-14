@@ -41,7 +41,7 @@ class Message(object):
         return self.type
 
 
-class ServerReply(object):
+class ServerMessage(object):
     def __init__(self, content, reply_type):
         self.content = content
         self.type = reply_type

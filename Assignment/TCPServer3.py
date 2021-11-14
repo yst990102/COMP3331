@@ -13,7 +13,7 @@ import sys, select, pickle, datetime, time
 
 
 from time import sleep
-from Message import MessageType, ServerReply, ServerReplyType
+from Message import MessageType, ServerMessage, ServerReplyType
 from TimeThread import TimeThread
 from helperfunctions import AddUserDataToTXT, InitializeBlockerList, LoadUserData
 
@@ -118,7 +118,7 @@ class ClientThread(Thread):
                     self.username = self.message_content['username']
                     if self.username == user:
                         block_message_content = f"You have been incorrect for 3 times. Account blocked for {timer.block_duration} sec."
-                        block_message = ServerReply(block_message_content, ServerReplyType.ACCOUNT_BLOCK)
+                        block_message = ServerMessage(block_message_content, ServerReplyType.ACCOUNT_BLOCK)
                         self.clientSocket.send(pickle.dumps(block_message))
                         is_user_blocked = True
                 if is_user_blocked: continue
@@ -138,7 +138,7 @@ class ClientThread(Thread):
                     
                     print("[check] Successfully Login! Time - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))    # print login finished & time 
                     if debug: print("login_blocked_list == ",login_blocked_list)
-                    login_success_message = ServerReply("Welcome to the greatest messaging application ever!", ServerReplyType.ANNONCEMENT)
+                    login_success_message = ServerMessage("Welcome to the greatest messaging application ever!", ServerReplyType.ANNONCEMENT)
                     self.clientSocket.send(pickle.dumps(login_success_message))
                     
                     # log in broadcast
@@ -191,13 +191,13 @@ class ClientThread(Thread):
             print("[recv] User already exists!! Check password!!")
 
             # request for password checking
-            passwd_request = ServerReply("This is a old user. ", ServerReplyType.REQUEST_NEEDPASSWORD)
+            passwd_request = ServerMessage("This is a old user. ", ServerReplyType.REQUEST_NEEDPASSWORD)
             self.clientSocket.send(pickle.dumps(passwd_request))
         # username is not in credential txt
         else:
             print("[recv] New User, please create password!")
             # request for new password
-            passwd_request = ServerReply("This is a new user. ", ServerReplyType.REQUEST_NEWUSER)
+            passwd_request = ServerMessage("This is a new user. ", ServerReplyType.REQUEST_NEWUSER)
             self.clientSocket.send(pickle.dumps(passwd_request))
             
     def process_login_newuser(self):
@@ -230,10 +230,10 @@ class ClientThread(Thread):
                 timeThread.start()
                 
                 block_message_content = f"You have been incorrect for 3 times. Account blocked for {timeThread.block_duration} sec."
-                block_message = ServerReply(block_message_content, ServerReplyType.ACCOUNT_BLOCK)
+                block_message = ServerMessage(block_message_content, ServerReplyType.ACCOUNT_BLOCK)
                 self.clientSocket.send(pickle.dumps(block_message))
             else:
-                passwd_request = ServerReply("Invalid Password. Please try again.", ServerReplyType.REQUEST_NEEDPASSWORD)
+                passwd_request = ServerMessage("Invalid Password. Please try again.", ServerReplyType.REQUEST_NEEDPASSWORD)
                 self.clientSocket.send(pickle.dumps(passwd_request))
             return False
 
@@ -242,7 +242,7 @@ class ClientThread(Thread):
             if thread.username != self.username and thread.is_alive():
                 if self.username not in blocker_list[thread.username]:      # only when you are not in that user's block list
                     broadcast_message_content = self.username + " logged in"
-                    broadcast_message = ServerReply(broadcast_message_content, ServerReplyType.ANNONCEMENT)
+                    broadcast_message = ServerMessage(broadcast_message_content, ServerReplyType.ANNONCEMENT)
                     thread.clientSocket.send(pickle.dumps(broadcast_message))
         return
 
@@ -251,14 +251,14 @@ class ClientThread(Thread):
         # validate the targer user
         if target_user not in UserData.keys():
             target_invalid_content = f"Invalid user"
-            target_invalid_message = ServerReply(target_invalid_content, ServerReplyType.ERROR)
+            target_invalid_message = ServerMessage(target_invalid_content, ServerReplyType.ERROR)
             self.clientSocket.send(pickle.dumps(target_invalid_message))
             return
         
         # when you are in the target's block list, you can't send message to your target
         if self.username in blocker_list[target_user]:
             stop_sending_content = f"Your message could not be delivered as the recipient has blocked you."
-            stop_sending_message = ServerReply(stop_sending_content, ServerReplyType.ANNONCEMENT)
+            stop_sending_message = ServerMessage(stop_sending_content, ServerReplyType.ANNONCEMENT)
             self.clientSocket.send(pickle.dumps(stop_sending_message))
             return
         else:
@@ -268,7 +268,7 @@ class ClientThread(Thread):
                 for thread in clientThread_list:
                     if thread.username == target_user and thread.is_alive():
                         message_content = f"[message] {self.username} : {target_message}"
-                        message_send = ServerReply(message_content, ServerReplyType.ANNONCEMENT)
+                        message_send = ServerMessage(message_content, ServerReplyType.ANNONCEMENT)
                         thread.clientSocket.send(pickle.dumps(message_send))
                         return
     
@@ -280,7 +280,7 @@ class ClientThread(Thread):
             if thread.username != self.username:
                 if self.username not in blocker_list[thread.username]:      # only when you are not in that user's block list
                     broadcast_message_content = f"[broadcast] {self.username} : " + self.message_content["message"]
-                    broadcast_message = ServerReply(broadcast_message_content, ServerReplyType.ANNONCEMENT)
+                    broadcast_message = ServerMessage(broadcast_message_content, ServerReplyType.ANNONCEMENT)
                     thread.clientSocket.send(pickle.dumps(broadcast_message))
                 else:
                     is_sb_blocked_me = True
@@ -288,7 +288,7 @@ class ClientThread(Thread):
         # tell the user that someone blocked him
         if is_sb_blocked_me:
             broadcast_feedback_content = f"Your message could not be delivered to some recipients"
-            broadcast_feedback_message = ServerReply(broadcast_feedback_content, ServerReplyType.ANNONCEMENT)
+            broadcast_feedback_message = ServerMessage(broadcast_feedback_content, ServerReplyType.ANNONCEMENT)
             self.clientSocket.send(pickle.dumps(broadcast_feedback_message))
         return
     
@@ -296,7 +296,7 @@ class ClientThread(Thread):
         for (username, login_time) in OnLine_list:
             if username != self.username:
                 if self.username not in blocker_list[username]:     # only when you are not in that user's block list
-                    whoelse_messge = ServerReply(username, ServerReplyType.ANNONCEMENT)
+                    whoelse_messge = ServerMessage(username, ServerReplyType.ANNONCEMENT)
                     self.clientSocket.send(pickle.dumps(whoelse_messge))
         return
     
@@ -316,7 +316,7 @@ class ClientThread(Thread):
         suitable_users = list(set(suitable_users))
         for username  in suitable_users:
             if self.username not in blocker_list[username]:     # only when you are not in that user's block list
-                whoelse_messge = ServerReply(username, ServerReplyType.ANNONCEMENT)
+                whoelse_messge = ServerMessage(username, ServerReplyType.ANNONCEMENT)
                 self.clientSocket.send(pickle.dumps(whoelse_messge))
         return
     
@@ -329,7 +329,7 @@ class ClientThread(Thread):
             target_invalid_content = f"Invalid user"
             print(f"[block] block failed : " + target_invalid_content)  # print info on server
 
-            target_invalid_message = ServerReply(target_invalid_content, ServerReplyType.ERROR)
+            target_invalid_message = ServerMessage(target_invalid_content, ServerReplyType.ERROR)
             self.clientSocket.send(pickle.dumps(target_invalid_message))
             return
         
@@ -340,7 +340,7 @@ class ClientThread(Thread):
             print(f"[block] Current blocker_list == {blocker_list}")    # print info on server
             
             blocked_message_content = f"{blocked_user} is blocked."
-            blocked_message = ServerReply(blocked_message_content, ServerReplyType.ANNONCEMENT)
+            blocked_message = ServerMessage(blocked_message_content, ServerReplyType.ANNONCEMENT)
             self.clientSocket.send(pickle.dumps(blocked_message))
         else:
             # you can't block yourself
@@ -351,7 +351,7 @@ class ClientThread(Thread):
                 error_message_content = f"{blocked_user} is already blocked."
             print(f"[block] block failed : " + error_message_content)   # print info on server
             
-            error_message = ServerReply(error_message_content, ServerReplyType.ERROR)
+            error_message = ServerMessage(error_message_content, ServerReplyType.ERROR)
             self.clientSocket.send(pickle.dumps(error_message))
         return
     
@@ -364,7 +364,7 @@ class ClientThread(Thread):
             target_invalid_content = f"Invalid user"
             print(f"[unblock] unblock failed : " + target_invalid_content)  # print info on server
             
-            target_invalid_message = ServerReply(target_invalid_content, ServerReplyType.ERROR)
+            target_invalid_message = ServerMessage(target_invalid_content, ServerReplyType.ERROR)
             self.clientSocket.send(pickle.dumps(target_invalid_message))
             return
         
@@ -375,7 +375,7 @@ class ClientThread(Thread):
             print(f"[unblock] Current blocker_list == {blocker_list}")    # print info on server
             
             unblocked_message_content = f"{unblocked_user} is unblocked."
-            unblocked_message = ServerReply(unblocked_message_content, ServerReplyType.ANNONCEMENT)
+            unblocked_message = ServerMessage(unblocked_message_content, ServerReplyType.ANNONCEMENT)
             self.clientSocket.send(pickle.dumps(unblocked_message))
         else:
             # you can't unblock yourself
@@ -386,7 +386,7 @@ class ClientThread(Thread):
                 error_message_content = f"{unblocked_user} was not blocked."
             print(f"[unblock] unblock failed : " + error_message_content)   # print info on server
             
-            error_message = ServerReply(error_message_content, ServerReplyType.ERROR)
+            error_message = ServerMessage(error_message_content, ServerReplyType.ERROR)
             self.clientSocket.send(pickle.dumps(error_message))
         return
     
@@ -409,12 +409,12 @@ class ClientThread(Thread):
                 # only announce to the people who did not block you
                 if self.username not in blocker_list[thread.username]:
                     broadcast_message_content = self.username + " logged out"
-                    broadcast_message = ServerReply(broadcast_message_content, ServerReplyType.ANNONCEMENT)
+                    broadcast_message = ServerMessage(broadcast_message_content, ServerReplyType.ANNONCEMENT)
                     thread.clientSocket.send(pickle.dumps(broadcast_message))
 
     def process_timeout(self):
         # send timeout server reply
-        timeout_message = ServerReply("Timeout ! Client has been terminated.", ServerReplyType.TIMEOUT)
+        timeout_message = ServerMessage("Timeout ! Client has been terminated.", ServerReplyType.TIMEOUT)
         self.clientSocket.send(pickle.dumps(timeout_message))
         # process logout
         self.process_logout()
