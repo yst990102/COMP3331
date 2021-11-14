@@ -19,7 +19,7 @@ class SendThread(Thread):
             [self.message_content, self.message_type] = MessageContentByType(self.message_send)
             
             if self.message_type == MessageType.NOCOMMAND:
-                print("No such Command, please re-type.")
+                print("== Error : Invalid command")
                 continue
             elif self.message_type == MessageType.MESSAGE:
                 messaged_message = Message(self.message_content, MessageType.MESSAGE)
