@@ -26,10 +26,14 @@ class SendThread(Thread):
             elif self.message_type == MessageType.BROADCAST:
                 broadcast_message = Message(self.message_content, MessageType.BROADCAST)
                 self.clientSocket.send(pickle.dumps(broadcast_message))
+                continue
             elif self.message_type == MessageType.WHOELSE:
                 whoelse_message = Message(self.message_content, MessageType.WHOELSE)
                 self.clientSocket.send(pickle.dumps(whoelse_message))
+                continue
             elif self.message_type == MessageType.WHOELSESINCE:
+                whoelsesince_message = Message(self.message_content, MessageType.WHOELSESINCE)
+                self.clientSocket.send(pickle.dumps(whoelsesince_message))
                 continue
             elif self.message_type == MessageType.BLOCK:
                 continue

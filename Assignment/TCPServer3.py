@@ -8,7 +8,7 @@
 """
 from socket import *
 from threading import Thread
-import sys, select, pickle, datetime
+import sys, select, pickle, datetime, time
 
 
 
@@ -88,6 +88,8 @@ class ClientThread(Thread):
 
             self.message_content = self.message.getContent()
             self.message_type = self.message.getType()
+            
+            if debug: print("Processing: %s" % self.message_content)
             
             if self.message_type == MessageType.LOGIN:                
                 # process login
@@ -220,6 +222,15 @@ class ClientThread(Thread):
         return
     
     def process_whoelsesince(self):
+        time_now = datetime.datetime.now()
+        time_now_stamp = time.mktime(time_now.timetuple())
+        
+        required_time_diff = self.message_content["time"]
+        for (username, login_time) in OnLine_list:
+            login_time_stamp = time.mktime(login_time.timetuple())
+            if username != self.username and (time_now_stamp - login_time_stamp) < required_time_diff:
+                whoelse_messge = ServerReply(username, ServerReplyType.ANNONCEMENT)
+                self.clientSocket.send(pickle.dumps(whoelse_messge))
         return
     
     def process_block(self):
