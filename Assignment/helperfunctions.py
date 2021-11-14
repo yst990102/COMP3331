@@ -41,6 +41,9 @@ def MessageContentByType(input_message:str):
         return [{"user":user}, message_type]
     elif message_type == MessageType.LOGOUT:
         return [{}, message_type]
+    elif message_type == MessageType.NOCOMMAND:
+        return [{}, message_type]
+        
 
 def StringToMessageType(string:str):
     if string == "message":
@@ -57,6 +60,8 @@ def StringToMessageType(string:str):
         return MessageType.UNBLOCK
     elif string == "logout":
         return MessageType.LOGOUT
+    else:
+        return MessageType.NOCOMMAND
     
 
 if __name__ == '__main__':

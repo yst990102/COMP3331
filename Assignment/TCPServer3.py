@@ -12,11 +12,14 @@ import sys, select, pickle, datetime
 
 
 
+from time import sleep
 from Message import MessageType, ServerReply, ServerReplyType
+from TimeThread import TimeThread
 from helperfunctions import AddUserDataToTXT, LoadUserData
 
+
 # debug
-debug = 0
+debug = 1
 
 
 # acquire server host and port from command line parameter
@@ -27,7 +30,7 @@ if len(sys.argv) != 4:
 serverHost = "127.0.0.1"
 serverPort = int(sys.argv[1])
 block_duration = int(sys.argv[2])
-timeout = int(sys.argv[3])
+timeout_duration = int(sys.argv[3])
 
 serverAddress = (serverHost, serverPort)
 
@@ -37,10 +40,9 @@ serverSocket.bind(serverAddress)
 
 # User Data
 UserData = LoadUserData('credentials.txt')
-if debug : print(UserData)
 
 OnLine_list = []
-
+login_blocked_list = []
 clientThread_list = []
 
 
@@ -53,58 +55,79 @@ clientThread_list = []
     for client-2. Each client will be runing in a separate therad, which is the multi-threading
 """
 class ClientThread(Thread):
-    def __init__(self, clientAddress, clientSocket):
+    def __init__(self, clientAddress, clientSocket:socket):
         Thread.__init__(self)
         self.clientAddress = clientAddress
         self.clientSocket = clientSocket
-        self.clientAlive = False
         
-        self.block_duration = block_duration
-        self.timeout = timeout
+        self.attempts = 0
+        self.clientAlive = False
         
         print("===== New connection created for: ", clientAddress)
         self.clientAlive = True
-        
+
+    
     def run(self):
         self.message = ''
         
         while self.clientAlive:
             # use recv() to receive message from the client
-            data = self.clientSocket.recv(1024)
-            self.message = pickle.loads(data)
-            
+            try:
+                data = self.clientSocket.recv(1024)
+                self.message = pickle.loads(data)
+            except timeout:
+                # auto logout when timeout reached
+                print("Socket Timeout. current time == ", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                self.process_timeout()
+                break
+            except EOFError:
+                print("Account has been blocked!")
+                if debug: print("login_blocked_list == ",login_blocked_list)
+                self.process_logout()
+                break
+
             self.message_content = self.message.getContent()
             self.message_type = self.message.getType()
             
-            if debug : print(self.message_content)
-            if debug : print(self.message_type)
-            if debug : print()
-            
-            if self.message_type == MessageType.LOGIN:
+            if self.message_type == MessageType.LOGIN:                
+                # process login
+                # 1. when login finished - True
+                # 2. when login unfinished - False
                 if self.process_login() == False:
                     continue
+                else:
+                    self.clientSocket.settimeout(timeout_duration)
 
-                login_info = (self.username, datetime.datetime.now())
-                # add user to the global online list
-                OnLine_list.append(login_info)
-                
-                print("[check] Successfully Login! Time - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))    # print login finished & time 
-                login_success_message = ServerReply("Welcome to the greatest messaging application ever!", ServerReplyType.ANNONCEMENT)
-                self.clientSocket.send(pickle.dumps(login_success_message))
+                    # add user to the global online list
+                    login_info = (self.username, datetime.datetime.now())
+                    OnLine_list.append(login_info)
+                    
+                    print("[check] Successfully Login! Time - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))    # print login finished & time 
+                    if debug: print("login_blocked_list == ",login_blocked_list)
+                    login_success_message = ServerReply("Welcome to the greatest messaging application ever!", ServerReplyType.ANNONCEMENT)
+                    self.clientSocket.send(pickle.dumps(login_success_message))
+                    continue
+            elif self.message_type == MessageType.MESSAGE:
+                self.process_message()
+                continue
             elif self.message_type == MessageType.BROADCAST:
                 self.process_broadcast()
                 continue
             elif self.message_type == MessageType.WHOELSE:
+                self.process_whoelse()
                 continue
             elif self.message_type == MessageType.WHOELSESINCE:
+                self.process_whoelsesince()
                 continue
             elif self.message_type == MessageType.BLOCK:
+                self.process_block()
                 continue
             elif self.message_type == MessageType.UNBLOCK:
+                self.process_unblock()
                 continue
             elif self.message_type == MessageType.LOGOUT:
                 self.process_logout()
-                break
+                continue
     
     """
         You can create more customized APIs here, e.g., logic for processing user authentication
@@ -121,24 +144,23 @@ class ClientThread(Thread):
             return self.process_login_olduser()
         elif 'newpassword' in self.message_content.keys():
             self.process_login_newuser()
-        return True
-        
+            return True
+
     def process_login_username(self):
         self.username = self.message_content['username']
-        
-        # refresh the user data before check user
-        UserData = LoadUserData('credentials.txt')
         
         # check if username in credential txt
         if self.username in UserData.keys():
             print("[recv] User already exists!! Check password!!")
+
             # request for password checking
-            passwd_request = ServerReply("", ServerReplyType.REQUEST_NEEDPASSWORD)
+            passwd_request = ServerReply("This is a old user. ", ServerReplyType.REQUEST_NEEDPASSWORD)
             self.clientSocket.send(pickle.dumps(passwd_request))
+        # username is not in credential txt
         else:
             print("[recv] New User, please create password!")
             # request for new password
-            passwd_request = ServerReply("This is a new user.", ServerReplyType.REQUEST_NEWUSER)
+            passwd_request = ServerReply("This is a new user. ", ServerReplyType.REQUEST_NEWUSER)
             self.clientSocket.send(pickle.dumps(passwd_request))
             
     def process_login_newuser(self):
@@ -153,26 +175,57 @@ class ClientThread(Thread):
     def process_login_olduser(self):
         self.passwd = self.message.getContent()['password']
         
-        # refresh the user data before check password
-        UserData = LoadUserData('credentials.txt')
-        
+        # print recv message in server
         print("[recv] password = %s" %self.passwd)
+        
+        # check password correction
         if UserData[self.username] == self.passwd:
             print("[check] Password Correct.")
             return True
         else:
             print("[check] Invalid Password. Please Re-type Password.")
-            passwd_request = ServerReply("Invalid Password. Please try again.", ServerReplyType.REQUEST_NEEDPASSWORD)
-            self.clientSocket.send(pickle.dumps(passwd_request))
+            print("attempts == %d" %self.attempts)
+            self.attempts += 1
+            if self.attempts == 3:
+                # start a timethread for block counting
+                timeThread = TimeThread(block_duration)
+                login_blocked_list.append((self.username, timeThread))
+                timeThread.start()
+                
+                block_message_content = f"You have been incorrect for 3 times. Account blocked for {timeThread.block_duration} sec."
+                block_message = ServerReply(block_message_content, ServerReplyType.ACCOUNT_BLOCK)
+                self.clientSocket.send(pickle.dumps(block_message))
+            else:
+                passwd_request = ServerReply("Invalid Password. Please try again.", ServerReplyType.REQUEST_NEEDPASSWORD)
+                self.clientSocket.send(pickle.dumps(passwd_request))
             return False
-        
-        
+
+    def process_message(self):
+        return
+    
     def process_broadcast(self):
+        print("[broadcast] " + self.username + " is broadcasting \"%s\"" %self.message_content["message"])
         for thread in clientThread_list:
             if thread.username != self.username:
                 broadcast_message_content = "[broadcast] " + self.username + ": "+ self.message_content["message"]
                 broadcast_message = ServerReply(broadcast_message_content, ServerReplyType.ANNONCEMENT)
                 thread.clientSocket.send(pickle.dumps(broadcast_message))
+        return
+    
+    def process_whoelse(self):
+        for (username, login_time) in OnLine_list:
+            if username != self.username:
+                whoelse_messge = ServerReply(username, ServerReplyType.ANNONCEMENT)
+                self.clientSocket.send(pickle.dumps(whoelse_messge))
+        return
+    
+    def process_whoelsesince(self):
+        return
+    
+    def process_block(self):
+        return
+    
+    def process_unblock(self):
         return
     
     def process_logout(self):
@@ -184,8 +237,19 @@ class ClientThread(Thread):
             if user[0] == self.username:
                 OnLine_list.remove(user)
         # broadcast logout message to all unblocked user
+        broadcast_message_content = self.username + " logged out"
+        broadcast_message = ServerReply(broadcast_message_content, ServerReplyType.ANNONCEMENT)
+        self.clientSocket.send(pickle.dumps(broadcast_message))
         return
 
+    def process_timeout(self):
+        # send timeout server reply
+        timeout_message = ServerReply("Timeout ! Client has been terminated.", ServerReplyType.TIMEOUT)
+        self.clientSocket.send(pickle.dumps(timeout_message))
+        # process logout
+        self.process_logout()
+        return
+    
 print("\n===== Server is running =====")
 print("===== Waiting for connection request from clients...=====")
 

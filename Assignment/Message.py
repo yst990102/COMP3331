@@ -1,8 +1,10 @@
 from enum import Enum
 
-
 class MessageType(Enum):
+    NOCOMMAND = -1
+    
     LOGIN = 0
+    
     MESSAGE = 1
     BROADCAST = 2
     WHOELSE = 3
@@ -14,12 +16,14 @@ class MessageType(Enum):
     STARTPRIVATE = 8
     PRIVATE = 9
     STOPPRIVATE = 10
+    
 
 class ServerReplyType(Enum):
     REQUEST_NEWUSER = 0
     REQUEST_NEEDPASSWORD = 1
     ANNONCEMENT = 2
-    ERROR = 3
+    TIMEOUT = 3
+    ACCOUNT_BLOCK = 4
 
 
 class Message(object):
