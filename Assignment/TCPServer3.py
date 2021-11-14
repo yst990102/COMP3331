@@ -322,34 +322,70 @@ class ClientThread(Thread):
     
     def process_block(self):
         blocked_user = self.message_content["user"]
+        print(f"[block] {self.username} is blocking {blocked_user}")    # print info on server
+        
+        # validate the blocked_user
+        if blocked_user not in UserData.keys():
+            target_invalid_content = f"Invalid user"
+            print(f"[block] block failed : " + target_invalid_content)  # print info on server
+
+            target_invalid_message = ServerReply(target_invalid_content, ServerReplyType.ERROR)
+            self.clientSocket.send(pickle.dumps(target_invalid_message))
+            return
+        
+        # normal case
         if self.username != blocked_user and blocked_user not in blocker_list[self.username]:
-            blocker_list[self.username].append(blocked_user)
+            blocker_list[self.username].append(blocked_user)    # append the user from blocker_list
+            print(f"[block] block success !")                           # print info on server
+            print(f"[block] Current blocker_list == {blocker_list}")    # print info on server
             
             blocked_message_content = f"{blocked_user} is blocked."
             blocked_message = ServerReply(blocked_message_content, ServerReplyType.ANNONCEMENT)
             self.clientSocket.send(pickle.dumps(blocked_message))
         else:
+            # you can't block yourself
             if self.username == blocked_user:
                 error_message_content = f"You can't block yourself!"
+            # you can't block a blocked user
             elif blocked_user in blocker_list[self.username]:
                 error_message_content = f"{blocked_user} is already blocked."
+            print(f"[block] block failed : " + error_message_content)   # print info on server
+            
             error_message = ServerReply(error_message_content, ServerReplyType.ERROR)
             self.clientSocket.send(pickle.dumps(error_message))
         return
     
     def process_unblock(self):
         unblocked_user = self.message_content["user"]
+        print(f"[unblock] {self.username} is unblocking {unblocked_user}")
+
+        # validate the unblocked_user
+        if unblocked_user not in UserData.keys():
+            target_invalid_content = f"Invalid user"
+            print(f"[unblock] unblock failed : " + target_invalid_content)  # print info on server
+            
+            target_invalid_message = ServerReply(target_invalid_content, ServerReplyType.ERROR)
+            self.clientSocket.send(pickle.dumps(target_invalid_message))
+            return
+        
+        # normal case
         if self.username != unblocked_user and unblocked_user in blocker_list[self.username]:
-            blocker_list[self.username].remove(unblocked_user)
+            blocker_list[self.username].remove(unblocked_user)      # remove the user from blocker_list
+            print(f"[unblock] unblock success !")                           # print info on server
+            print(f"[unblock] Current blocker_list == {blocker_list}")    # print info on server
             
             unblocked_message_content = f"{unblocked_user} is unblocked."
             unblocked_message = ServerReply(unblocked_message_content, ServerReplyType.ANNONCEMENT)
             self.clientSocket.send(pickle.dumps(unblocked_message))
         else:
+            # you can't unblock yourself
             if self.username == unblocked_user:
                 error_message_content = f"You can't unblock yourself!"
+            # you can't unblock a non-blocked user
             elif unblocked_user not in blocker_list[self.username]:
                 error_message_content = f"{unblocked_user} was not blocked."
+            print(f"[unblock] unblock failed : " + error_message_content)   # print info on server
+            
             error_message = ServerReply(error_message_content, ServerReplyType.ERROR)
             self.clientSocket.send(pickle.dumps(error_message))
         return
@@ -357,7 +393,7 @@ class ClientThread(Thread):
     def process_logout(self):
         # get logout message, print diconnected announcement
         self.clientAlive = False
-        print("===== the user disconnected - ", self.clientAddress)
+        print(f"===== {self.username} disconnected - {self.clientAddress}")
         # remove user from online list
         for user in OnLine_list[:]:
             if user[0] == self.username:
@@ -370,6 +406,7 @@ class ClientThread(Thread):
         # broadcast logout message to all unblocked user
         for thread in clientThread_list:
             if thread.username != self.username and thread.is_alive():
+                # only announce to the people who did not block you
                 if self.username not in blocker_list[thread.username]:
                     broadcast_message_content = self.username + " logged out"
                     broadcast_message = ServerReply(broadcast_message_content, ServerReplyType.ANNONCEMENT)
