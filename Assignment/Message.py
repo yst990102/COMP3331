@@ -19,11 +19,14 @@ class MessageType(Enum):
     
 
 class ServerReplyType(Enum):
+    ERROR = -1
+    
     REQUEST_NEWUSER = 0
     REQUEST_NEEDPASSWORD = 1
     ANNONCEMENT = 2
     TIMEOUT = 3
     ACCOUNT_BLOCK = 4
+    
 
 
 class Message(object):

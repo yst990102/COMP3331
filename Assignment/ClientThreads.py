@@ -38,8 +38,12 @@ class SendThread(Thread):
                 self.clientSocket.send(pickle.dumps(whoelsesince_message))
                 continue
             elif self.message_type == MessageType.BLOCK:
+                block_message = Message(self.message_content, MessageType.BLOCK)
+                self.clientSocket.send(pickle.dumps(block_message))
                 continue
             elif self.message_type == MessageType.UNBLOCK:
+                block_message = Message(self.message_content, MessageType.UNBLOCK)
+                self.clientSocket.send(pickle.dumps(block_message))
                 continue
             elif self.message_type == MessageType.LOGOUT:
                 # tell server that client has logout
@@ -74,4 +78,9 @@ class ReceiveThread(Thread):
                 # print account blocked message & terminate client
                 print(self.message_received.getContent())
                 os._exit(0)
+            elif self.message_received.getType() == ServerReplyType.ERROR:
+                # print error message
+                error_message = f"== Error : {self.message_received.getContent()}"
+                print(error_message)
+
 

@@ -15,11 +15,11 @@ import sys, select, pickle, datetime, time
 from time import sleep
 from Message import MessageType, ServerReply, ServerReplyType
 from TimeThread import TimeThread
-from helperfunctions import AddUserDataToTXT, LoadUserData
+from helperfunctions import AddUserDataToTXT, InitializeBlockerList, LoadUserData
 
 
 # debug
-debug = 1
+debug = 0
 
 
 # acquire server host and port from command line parameter
@@ -41,9 +41,24 @@ serverSocket.bind(serverAddress)
 # User Data
 UserData = LoadUserData('credentials.txt')
 
+# online_list have all the login message of online_users
+# online_list format : [{user: login_time_of_user}, ...]
 OnLine_list = []
+
+# loghistory will be similar to online_list, but will not remove user when they logout
+# loghistory format : [{user: login_time_of_user}, ...]
+Log_history = []
+
+# login_blocked_list have all the users that be banned from login
+# login_blocked_list format : [{username : timerThread}, ...]
 login_blocked_list = []
+
+# clientThread_list has all the Client Thread that running
+# clientThread_list format : [ClientThread01, ClientThread02, ...]
 clientThread_list = []
+
+# blocker_list format : {user: people_blocked_by_user, ...}
+blocker_list = InitializeBlockerList(UserData)
 
 
 """
@@ -119,11 +134,15 @@ class ClientThread(Thread):
                     # add user to the global online list
                     login_info = (self.username, datetime.datetime.now())
                     OnLine_list.append(login_info)
+                    Log_history.append(login_info)
                     
                     print("[check] Successfully Login! Time - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))    # print login finished & time 
                     if debug: print("login_blocked_list == ",login_blocked_list)
                     login_success_message = ServerReply("Welcome to the greatest messaging application ever!", ServerReplyType.ANNONCEMENT)
                     self.clientSocket.send(pickle.dumps(login_success_message))
+                    
+                    # log in broadcast
+                    self.process_login_broadcast()
                     continue
             elif self.message_type == MessageType.MESSAGE:
                 self.process_message()
@@ -218,14 +237,22 @@ class ClientThread(Thread):
                 self.clientSocket.send(pickle.dumps(passwd_request))
             return False
 
+    def process_login_broadcast(self):
+        for thread in clientThread_list:
+            if thread.username != self.username and thread.is_alive():
+                broadcast_message_content = self.username + " logged in"
+                broadcast_message = ServerReply(broadcast_message_content, ServerReplyType.ANNONCEMENT)
+                thread.clientSocket.send(pickle.dumps(broadcast_message))
+        return
+
     def process_message(self):
         target_user = self.message_content["user"]
         target_message = self.message_content["message"]
         
         for (user, login_time) in OnLine_list:
             for thread in clientThread_list:
-                if thread.username == target_user:
-                    message_content = f"{self.username} : {target_message}"
+                if thread.username == target_user and thread.is_alive():
+                    message_content = f"[message] {self.username} : {target_message}"
                     message_send = ServerReply(message_content, ServerReplyType.ANNONCEMENT)
                     thread.clientSocket.send(pickle.dumps(message_send))
                     return
@@ -235,7 +262,7 @@ class ClientThread(Thread):
         print("[broadcast] " + self.username + " is broadcasting \"%s\"" %self.message_content["message"])
         for thread in clientThread_list:
             if thread.username != self.username:
-                broadcast_message_content = "[broadcast] " + self.username + ": "+ self.message_content["message"]
+                broadcast_message_content = f"[broadcast] {self.username} : " + self.message_content["message"]
                 broadcast_message = ServerReply(broadcast_message_content, ServerReplyType.ANNONCEMENT)
                 thread.clientSocket.send(pickle.dumps(broadcast_message))
         return
@@ -252,19 +279,52 @@ class ClientThread(Thread):
         time_now_stamp = time.mktime(time_now.timetuple())
         
         required_time_diff = self.message_content["time"]
-        for (username, login_time) in OnLine_list:
+        suitable_users = []
+        for (username, login_time) in Log_history:
             login_time_stamp = time.mktime(login_time.timetuple())
             if username != self.username:
                 if debug: print(f"time_now == {time_now}, time_diff = {(time_now_stamp - login_time_stamp)}")
                 if (time_now_stamp - login_time_stamp) < required_time_diff:
-                    whoelse_messge = ServerReply(username, ServerReplyType.ANNONCEMENT)
-                    self.clientSocket.send(pickle.dumps(whoelse_messge))
+                    suitable_users.append(username)
+        # deletet all repeat user log
+        suitable_users = list(set(suitable_users))
+        for username  in suitable_users:
+            whoelse_messge = ServerReply(username, ServerReplyType.ANNONCEMENT)
+            self.clientSocket.send(pickle.dumps(whoelse_messge))
         return
     
     def process_block(self):
+        blocked_user = self.message_content["user"]
+        if self.username != blocked_user and blocked_user not in blocker_list[self.username]:
+            blocker_list[self.username].append(blocked_user)
+            
+            blocked_message_content = f"{blocked_user} is blocked."
+            blocked_message = ServerReply(blocked_message_content, ServerReplyType.ANNONCEMENT)
+            self.clientSocket.send(pickle.dumps(blocked_message))
+        else:
+            if self.username == blocked_user:
+                error_message_content = f"You can't block yourself!"
+            elif blocked_user in blocker_list[self.username]:
+                error_message_content = f"You have already block {blocked_user}"
+            error_message = ServerReply(error_message_content, ServerReplyType.ERROR)
+            self.clientSocket.send(pickle.dumps(error_message))
         return
     
     def process_unblock(self):
+        unblocked_user = self.message_content["user"]
+        if self.username != unblocked_user and unblocked_user in blocker_list[self.username]:
+            blocker_list[self.username].remove(unblocked_user)
+            
+            unblocked_message_content = f"{unblocked_user} is unblocked."
+            unblocked_message = ServerReply(unblocked_message_content, ServerReplyType.ANNONCEMENT)
+            self.clientSocket.send(pickle.dumps(unblocked_message))
+        else:
+            if self.username == unblocked_user:
+                error_message_content = f"You can't unblock yourself!"
+            elif unblocked_user not in blocker_list[self.username]:
+                error_message_content = f"You haven't block {unblocked_user}"
+            error_message = ServerReply(error_message_content, ServerReplyType.ERROR)
+            self.clientSocket.send(pickle.dumps(error_message))
         return
     
     def process_logout(self):
@@ -275,11 +335,17 @@ class ClientThread(Thread):
         for user in OnLine_list[:]:
             if user[0] == self.username:
                 OnLine_list.remove(user)
-        # broadcast logout message to all unblocked user
-        broadcast_message_content = self.username + " logged out"
-        broadcast_message = ServerReply(broadcast_message_content, ServerReplyType.ANNONCEMENT)
-        self.clientSocket.send(pickle.dumps(broadcast_message))
+        # log out broadcast
+        self.process_logout_broadcast()
         return
+
+    def process_logout_broadcast(self):
+        # broadcast logout message to all unblocked user
+        for thread in clientThread_list:
+            if thread.username != self.username and thread.is_alive():
+                broadcast_message_content = self.username + " logged out"
+                broadcast_message = ServerReply(broadcast_message_content, ServerReplyType.ANNONCEMENT)
+                thread.clientSocket.send(pickle.dumps(broadcast_message))
 
     def process_timeout(self):
         # send timeout server reply

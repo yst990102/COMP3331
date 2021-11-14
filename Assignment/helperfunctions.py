@@ -17,6 +17,13 @@ def AddUserDataToTXT(filename, userdata):
     UserDataFile.close()
     return
 
+def InitializeBlockerList(userdata:dict):
+    blocker_list = {}
+    for user in userdata.keys():
+        blocker_list.update({user:[]})
+    return blocker_list
+
+
 def MessageContentByType(input_message:str):
     input_list = input_message.split(" ")
     message_type = StringToMessageType(input_list[0])
