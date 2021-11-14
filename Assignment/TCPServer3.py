@@ -91,7 +91,23 @@ class ClientThread(Thread):
             
             if debug: print("Processing: %s" % self.message_content)
             
-            if self.message_type == MessageType.LOGIN:                
+            if self.message_type == MessageType.LOGIN:
+                # before process login, check the login_block_list , remove all unblocked user
+                for (user, timer) in login_blocked_list[:]:
+                    if timer.is_alive() == False:
+                        login_blocked_list.remove((user, timer))
+                
+                # if user is still blocked , continue
+                is_user_blocked = False
+                for (user, timer) in login_blocked_list:
+                    self.username = self.message_content['username']
+                    if self.username == user:
+                        block_message_content = f"You have been incorrect for 3 times. Account blocked for {timer.block_duration} sec."
+                        block_message = ServerReply(block_message_content, ServerReplyType.ACCOUNT_BLOCK)
+                        self.clientSocket.send(pickle.dumps(block_message))
+                        is_user_blocked = True
+                if is_user_blocked: continue
+                
                 # process login
                 # 1. when login finished - True
                 # 2. when login unfinished - False
@@ -203,6 +219,16 @@ class ClientThread(Thread):
             return False
 
     def process_message(self):
+        target_user = self.message_content["user"]
+        target_message = self.message_content["message"]
+        
+        for (user, login_time) in OnLine_list:
+            for thread in clientThread_list:
+                if thread.username == target_user:
+                    message_content = f"{self.username} : {target_message}"
+                    message_send = ServerReply(message_content, ServerReplyType.ANNONCEMENT)
+                    thread.clientSocket.send(pickle.dumps(message_send))
+                    return
         return
     
     def process_broadcast(self):
@@ -228,9 +254,11 @@ class ClientThread(Thread):
         required_time_diff = self.message_content["time"]
         for (username, login_time) in OnLine_list:
             login_time_stamp = time.mktime(login_time.timetuple())
-            if username != self.username and (time_now_stamp - login_time_stamp) < required_time_diff:
-                whoelse_messge = ServerReply(username, ServerReplyType.ANNONCEMENT)
-                self.clientSocket.send(pickle.dumps(whoelse_messge))
+            if username != self.username:
+                if debug: print(f"time_now == {time_now}, time_diff = {(time_now_stamp - login_time_stamp)}")
+                if (time_now_stamp - login_time_stamp) < required_time_diff:
+                    whoelse_messge = ServerReply(username, ServerReplyType.ANNONCEMENT)
+                    self.clientSocket.send(pickle.dumps(whoelse_messge))
         return
     
     def process_block(self):

@@ -22,6 +22,8 @@ class SendThread(Thread):
                 print("No such Command, please re-type.")
                 continue
             elif self.message_type == MessageType.MESSAGE:
+                messaged_message = Message(self.message_content, MessageType.MESSAGE)
+                self.clientSocket.send(pickle.dumps(messaged_message))
                 continue
             elif self.message_type == MessageType.BROADCAST:
                 broadcast_message = Message(self.message_content, MessageType.BROADCAST)
@@ -66,6 +68,10 @@ class ReceiveThread(Thread):
                 print(self.message_received.getContent())
             elif self.message_received.getType() == ServerReplyType.TIMEOUT:
                 # print timeout message & terminate client
+                print(self.message_received.getContent())
+                os._exit(0)
+            elif self.message_received.getType() == ServerReplyType.ACCOUNT_BLOCK:
+                # print account blocked message & terminate client
                 print(self.message_received.getContent())
                 os._exit(0)
 
