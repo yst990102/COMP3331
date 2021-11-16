@@ -23,6 +23,11 @@ def InitializeBlockerList(userdata:dict):
         blocker_list.update({user:[]})
     return blocker_list
 
+def InitializeStoredMessageList(userdata:dict):
+    stored_message_list = {}
+    for user in userdata.keys():
+        stored_message_list.update({user:[]})
+    return stored_message_list
 
 def MessageContentByType(input_message:str):
     input_list = input_message.split(" ")
@@ -58,6 +63,10 @@ def MessageContentByType(input_message:str):
     elif message_type == MessageType.STOPPRIVATE:
         user = input_list[1]
         return [{"user":user}, message_type]
+    elif message_type == MessageType.YES:
+        return [{}, message_type]
+    elif message_type == MessageType.NO:
+        return [{}, message_type]
     elif message_type == MessageType.NOCOMMAND:
         return [{}, message_type]
         
@@ -83,6 +92,10 @@ def StringToMessageType(string:str):
         return MessageType.PRIVATE
     elif string == "stopprivate":
         return MessageType.STOPPRIVATE
+    elif string == "y":
+        return MessageType.YES
+    elif string == "n":
+        return MessageType.NO
     else:
         return MessageType.NOCOMMAND
     

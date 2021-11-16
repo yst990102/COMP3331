@@ -19,8 +19,11 @@ class MessageType(Enum):
     PRIVATE = 9
     STOPPRIVATE = 10
     
+    YES = 11
+    NO = 12
+    
 
-class ServerReplyType(Enum):
+class ServerMessageType(Enum):
     ERROR = -1
     
     REQUEST_NEWUSER = 0
@@ -29,6 +32,8 @@ class ServerReplyType(Enum):
     TIMEOUT = 3
     ACCOUNT_BLOCK = 4
     
+    REQUEST_PRIVATE = 5
+    SEND_ADDRESS = 6
 
 
 class Message(object):

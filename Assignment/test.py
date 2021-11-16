@@ -1,8 +1,19 @@
-import time, datetime
+from socket import socket
+import socket
 
-time1 = datetime.datetime.now()
-time.sleep(5)
-time2 = datetime.datetime.now()
+if __name__ == "__main__":
+    client01 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    clientaddress01 = ("127.0.0.1", 3000)
+    client01.bind(clientaddress01)
+    
 
-time_diff = time.mktime(time2.timetuple()) - time.mktime(time1.timetuple())
-print(time_diff)
+    print("client01 set up")
+    
+    client01.listen()
+    clientSockt, clientAddress = client01.accept()
+    
+    while True:
+        data = clientSockt.recv(1024)
+        receivedMessage = data.decode()
+        
+        print(f"{receivedMessage}")
