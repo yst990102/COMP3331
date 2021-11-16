@@ -14,5 +14,10 @@ if __name__ == "__main__":
         if message == 'quit':
             break
         client02.sendall(message.encode())
+        
+        data = clientSockt.recv(1024)
+        receivedMessage = data.decode()
+        
+        print(f"{receivedMessage}")
     
     client02.close()

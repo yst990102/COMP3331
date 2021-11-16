@@ -35,6 +35,7 @@ message_send = ""
 message_received = ""
 
 confirm_wait = False
+requester = ""
 
 username = None
 password = None
@@ -47,6 +48,7 @@ class SendThread(Thread):
     
     def run(self):
         global message_send
+        global message_received
         global username
         global password
         global confirm_wait
@@ -69,16 +71,15 @@ class SendThread(Thread):
                 if confirm_wait == True:
                     if message_send in ['y', 'n']:
                         if self.message_type == MessageType.YES:
-                            print("TODO： send confirm message.")
-                            confirmed_message = Message(self.message_content, MessageType.YES)
+                            print(f"TODO： send confirm message. {message_received.getContent()}")
+                            confirmed_message = Message(message_received.getContent(), MessageType.YES)
                             self.clientSocket.send(pickle.dumps(confirmed_message))
-                            continue
                         elif self.message_type == MessageType.NO:
-                            print("TODO： send refuse message.")
+                            print(f"TODO： send refuse message.")
                             refused_message = Message(self.message_content, MessageType.NO)
                             self.clientSocket.send(pickle.dumps(refused_message))
-                            continue
                         confirm_wait = False
+                        continue
                     else:
                         print("Please enter y or n: ")
                         continue

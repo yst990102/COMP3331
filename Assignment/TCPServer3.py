@@ -156,6 +156,20 @@ class ClientThread(Thread):
                 continue
             elif self.message_type == MessageType.STOPPRIVATE:
                 continue
+            elif self.message_type == MessageType.YES:
+                if debug: print("[recv] Private requset has been confirmed.")
+                if debug: print(f"self.message_content == {self.message_content}")
+                # search for requester thread
+                for thread in clientThread_list:
+                    if thread.login == True:
+                        if thread.username == self.message_content['requester']:
+                            confirmed_feedback = ServerMessage(f"{self.username} has confirmed your request. address = {clientAddress}", ServerMessageType.ANNONCEMENT)
+                            thread.clientSocket.send(pickle.dumps(confirmed_feedback))
+                            break
+                continue
+            elif self.message_type == MessageType.NO:
+                if debug: print("[recv] Private requset has been refused.")
+                continue
     """
         You can create more customized APIs here, e.g., logic for processing user authentication
         Each api can be used to handle one specific function, for example:
@@ -350,6 +364,10 @@ class ClientThread(Thread):
                 if debug : print(f"[broadcast] {target_user} is currently online")
                 # check if self.user is block by target_user
                 if self.username in blocker_list[target_user]:      # online but blocked you, return
+                    # tell self.user that somebody has blocked you
+                    blocked_message_content = "Your message could not be delivered to some recipients"
+                    blocked_message = ServerMessage(blocked_message_content, ServerMessageType.ANNONCEMENT)
+                    self.clientSocket.send(pickle.dumps(blocked_message))
                     continue
                 else:                                               # online and not blocked you, send message via thread.socket
                     for thread in clientThread_list:
@@ -363,6 +381,10 @@ class ClientThread(Thread):
             else:
                 if debug : print(f"[broadcast] {target_user} is currently offline")
                 if self.username in blocker_list[target_user]:
+                    # tell self.user that somebody has blocked you
+                    blocked_message_content = "Your message could not be delivered to some recipients"
+                    blocked_message = ServerMessage(blocked_message_content, ServerMessageType.ANNONCEMENT)
+                    self.clientSocket.send(pickle.dumps(blocked_message))
                     continue
                 else:
                     global stored_message_list
@@ -508,8 +530,15 @@ class ClientThread(Thread):
             if thread.login:
                 if thread.username == target_user and thread.is_alive():
                     print(f"[request] {self.username} Request {thread.username} for private connection.")
-                    startprivate_message = ServerMessage(f"{self.username} would like to private message.", ServerMessageType.REQUEST_PRIVATE)
+                    # anouncement for start private request
+                    startprivate_announcement = ServerMessage(f"{self.username} would like to private message.", ServerMessageType.ANNONCEMENT)
+                    thread.clientSocket.send(pickle.dumps(startprivate_announcement))
+                    
+                    time.sleep(0.01)
+                    
+                    startprivate_message = ServerMessage({'requester':self.username}, ServerMessageType.REQUEST_PRIVATE)
                     thread.clientSocket.send(pickle.dumps(startprivate_message))
+                    
                     return
         # cannot find target user in thread_list, return target offline error
         print(f"TODO: cannot send request to {target_user}")
