@@ -8,7 +8,7 @@ class TimeThread(Thread):
     
     def run(self):
         while self.block_duration:
-            print("account blocked remaining == ",self.block_duration)
+            # print("account blocked remaining == ",self.block_duration)
             self.block_duration -= 1
             sleep(1)
             if self.block_duration == 0: break

@@ -2,8 +2,10 @@ from enum import Enum
 
 class MessageType(Enum):
     NOCOMMAND = -1
-    
-    LOGIN = 0
+
+    LOGIN_USERNAME = 0.1
+    LOGIN_PASSWD = 0.2
+    LOGIN_NEWPASSWD = 0.3
     
     MESSAGE = 1
     BROADCAST = 2
