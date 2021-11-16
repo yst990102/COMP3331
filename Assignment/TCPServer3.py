@@ -247,7 +247,7 @@ class ClientThread(Thread):
         is_user_blocked = False
         for (user, timer) in login_blocked_list:
             if checked_user == user:
-                block_message_content = f"You have been incorrect for 3 times. Account blocked for {timer.block_duration} sec."
+                block_message_content = f"Too many incorrect password entried. Account blocked for {timer.block_duration} sec."
                 block_message = ServerMessage(block_message_content, ServerReplyType.ACCOUNT_BLOCK)
                 self.clientSocket.send(pickle.dumps(block_message))
                 is_user_blocked = True

@@ -48,6 +48,16 @@ def MessageContentByType(input_message:str):
         return [{"user":user}, message_type]
     elif message_type == MessageType.LOGOUT:
         return [{}, message_type]
+    elif message_type == MessageType.STARTPRIVATE:
+        user = input_list[1]
+        return [{"user":user}, message_type]
+    elif message_type == MessageType.PRIVATE:
+        user = input_list[1]
+        message = " ".join(input_list[2:])
+        return [{"user":user, "message":message}, message_type]
+    elif message_type == MessageType.STOPPRIVATE:
+        user = input_list[1]
+        return [{"user":user}, message_type]
     elif message_type == MessageType.NOCOMMAND:
         return [{}, message_type]
         
@@ -67,6 +77,12 @@ def StringToMessageType(string:str):
         return MessageType.UNBLOCK
     elif string == "logout":
         return MessageType.LOGOUT
+    elif string == "startprivate":
+        return MessageType.STARTPRIVATE
+    elif string == "private":
+        return MessageType.PRIVATE
+    elif string == "stopprivate":
+        return MessageType.STOPPRIVATE
     else:
         return MessageType.NOCOMMAND
     

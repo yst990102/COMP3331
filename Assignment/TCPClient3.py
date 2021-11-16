@@ -31,7 +31,7 @@ clientSocket = socket(AF_INET, SOCK_STREAM)
 clientSocket.connect(serverAddress)
 
 class SendThread(Thread):
-    def __init__(self, clientSocket):
+    def __init__(self, clientSocket:socket):
         Thread.__init__(self)
         self.clientSocket = clientSocket
         self.Alive = True
@@ -77,6 +77,8 @@ class SendThread(Thread):
                 
                 # print logout message & terminate client
                 print("Log out successfullly.")
+                # turn off socket & exit
+                self.clientSocket.close()
                 os._exit(0)
 
 
@@ -98,10 +100,14 @@ class ReceiveThread(Thread):
             elif self.message_received.getType() == ServerReplyType.TIMEOUT:
                 # print timeout message & terminate client
                 print(self.message_received.getContent())
+                # turn off socket & exit
+                self.clientSocket.close()
                 os._exit(0)
             elif self.message_received.getType() == ServerReplyType.ACCOUNT_BLOCK:
                 # print account blocked message & terminate client
                 print(self.message_received.getContent())
+                # turn off socket & exit
+                self.clientSocket.close()
                 os._exit(0)
             elif self.message_received.getType() == ServerReplyType.ERROR:
                 # print error message
