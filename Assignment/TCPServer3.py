@@ -104,6 +104,7 @@ class ClientThread(Thread):
                 break
             except EOFError or ConnectionResetError:
                 print(f"Connection {self.clientAddress} was shut down.")
+                self.process_logout()
                 break
 
             self.message_content = self.message.getContent()
@@ -157,6 +158,10 @@ class ClientThread(Thread):
                 self.process_startprivate()
                 continue
             elif self.message_type == MessageType.STOPPRIVATE:
+                self.process_stopprivate()
+                continue
+            elif self.message_type == MessageType.STOPPRIVATE_PRIVATE_STOPPED:
+                self.process_stopped_private_feedback()
                 continue
             elif self.message_type == MessageType.YES:
                 print("[request] Request has been confirmed!")
@@ -311,7 +316,6 @@ class ClientThread(Thread):
                 if debug : print(f"[loading stored message] message content == {stored_message.getContent()}, type == {stored_message.getType()}")
                 self.clientSocket.send(pickle.dumps(stored_message))
                 stored_message_list[self.username].remove(stored_message)   # remove the stored message that have been re-sent
-                time.sleep(0.01)
             
             stored_split_line2 = ServerMessage("********************************************************\n", ServerMessageType.ANNONCEMENT)
             self.clientSocket.send(pickle.dumps(stored_split_line2))
@@ -367,17 +371,18 @@ class ClientThread(Thread):
             target_message = self.message_content["message"]
             # if the target user is online, loop through the thread_list and send message
             for thread in clientThread_list:
-                if thread.login == True:
-                    if thread.username == target_user and thread.is_alive():
+                if thread.username == target_user:
+                    if thread.login == True and thread.is_alive():
                         message_content = f"[message] {self.username} : {target_message}"
                         message_send = ServerMessage(message_content, ServerMessageType.ANNONCEMENT)
                         thread.clientSocket.send(pickle.dumps(message_send))
                         return
-            # if the target_user is offline, store the message into stored_message_list['target_user']
-            global stored_message_list
-            stored_message_content = f"[message] {self.username} : {target_message}"
-            message_stored = ServerMessage(stored_message_content, ServerMessageType.ANNONCEMENT)
-            stored_message_list[target_user].append(message_stored)
+                    else:
+                        # if the target_user is offline, store the message into stored_message_list['target_user']
+                        stored_message_content = f"[message] {self.username} : {target_message}"
+                        message_stored = ServerMessage(stored_message_content, ServerMessageType.ANNONCEMENT)
+                        stored_message_list[target_user].append(message_stored)
+                        return
     
     def process_broadcast(self):
         global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
@@ -601,6 +606,36 @@ class ClientThread(Thread):
         self.clientSocket.send(pickle.dumps(offline_error_message))
 
         return
+    
+    def process_stopprivate(self):
+        target_user = self.message_content['user']
+        deluser = self.message_content['deluser']
+        for thread in clientThread_list:
+            if thread.login == True:
+                if thread.username == target_user and thread.is_alive():
+                    stopprivate_message = ServerMessage({"deluser": deluser}, ServerMessageType.STOP_AND_DELETE_PRIVATE)
+                    thread.clientSocket.send(pickle.dumps(stopprivate_message))
+                    return
+
+        error_message_content = f"Stop private messaging with {target_user} can not be executed."
+        error_message = ServerMessage(error_message_content, ServerMessageType.ERROR)
+        self.clientSocket.send(error_message)
+        return
+    
+    def process_stopped_private_feedback(self):
+        feedback_user = self.message_content['deleteduser']
+        for thread in clientThread_list:
+            if thread.login == True:
+                if thread.username == feedback_user and thread.is_alive():
+                    stopped_confirm_message_content = f"Your Private Messaging with {self.username} has been terminated."
+                    stopped_confirm_message = ServerMessage(stopped_confirm_message_content, ServerMessageType.STOPPED_PRIVATE_CONFIRM)
+                    thread.clientSocket.send(pickle.dumps(stopped_confirm_message))
+                    return
+        error_message_content = f"Stop private messaging confirmation can not be send back to {feedback_user}"
+        error_message = ServerMessage(error_message_content, ServerMessageType.ERROR)
+        self.clientSocket.send(error_message)
+        return
+    
     
 print("\n===== Server is running =====")
 print("===== Waiting for connection request from clients...=====")
