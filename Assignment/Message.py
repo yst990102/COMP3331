@@ -24,16 +24,16 @@ class MessageType(Enum):
     
 
 class ServerMessageType(Enum):
-    ERROR = -1
+    ERROR = -100
     
-    REQUEST_NEWUSER = 0
-    REQUEST_NEEDPASSWORD = 1
-    ANNONCEMENT = 2
-    TIMEOUT = 3
-    ACCOUNT_BLOCK = 4
+    REQUEST_NEWUSER = 101
+    REQUEST_NEEDPASSWORD = 102
+    ANNONCEMENT = 103
+    TIMEOUT = 104
+    ACCOUNT_BLOCK = 105
     
-    REQUEST_PRIVATE = 5
-    SEND_ADDRESS = 6
+    REQUEST_PRIVATE = 106
+    SEND_ADDRESS = 107
 
 
 class Message(object):

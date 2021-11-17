@@ -165,6 +165,14 @@ class ClientThread(Thread):
                         if thread.username == self.message_content['requester']:
                             confirmed_feedback = ServerMessage(f"{self.username} has confirmed your request. address = {clientAddress}", ServerMessageType.ANNONCEMENT)
                             thread.clientSocket.send(pickle.dumps(confirmed_feedback))
+                            
+                            # send feedback to requester
+                            requester_feedback = ServerMessage({"address":clientAddress}, ServerMessageType.SEND_ADDRESS)
+                            thread.clientSocket.send(pickle.dumps(requester_feedback))
+                            
+                            # send feedback to targetuser
+                            targetuser_feedback = ServerMessage({"address":thread.clientAddress}, ServerMessageType.SEND_ADDRESS)
+                            self.clientSocket.send(pickle.dumps(targetuser_feedback))
                             break
                 continue
             elif self.message_type == MessageType.NO:

@@ -123,6 +123,7 @@ class SendThread(Thread):
                         os._exit(0)
                     elif self.message_type == MessageType.STARTPRIVATE:
                         print(f"TODO： send start private. {self.message_content} {self.message_type}")
+                        # ask server to send request
                         startprivate_message = Message(self.message_content, MessageType.STARTPRIVATE)
                         self.clientSocket.send(pickle.dumps(startprivate_message))
                         continue
@@ -191,7 +192,7 @@ class ReceiveThread(Thread):
                 confirm_wait = True
             elif message_received.getType() == ServerMessageType.SEND_ADDRESS:
                 # print target private_client_address
-                print(message_received.getContent())
+                print(f"Got ClientAddress : {message_received.getContent()}")
 
 
 # define sendThread and receiveThread
