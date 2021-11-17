@@ -12,6 +12,7 @@ import pickle
 from typing import Tuple
 
 from Message import Message, MessageType, ServerMessageType
+from PrivateThread import PrivateReceiveThread, PrivateSendThread
 from helperfunctions import MessageContentByType
 from threading import Thread
 # debug switch
@@ -35,10 +36,15 @@ message_send = ""
 message_received = ""
 
 confirm_wait = False
-requester = ""
 
 username = None
 password = None
+
+# private threads
+# format : {user: private_thread, ...}
+private_send_thread_list = {}
+
+private_receive_thread_list = {}
 
 class SendThread(Thread):
     def __init__(self, clientSocket:socket):
@@ -52,6 +58,7 @@ class SendThread(Thread):
         global username
         global password
         global confirm_wait
+        global private_thread_list
         
         while self.Alive:
             if username == None:
@@ -70,10 +77,22 @@ class SendThread(Thread):
                 
                 if confirm_wait == True:
                     if message_send in ['y', 'n']:
-                        if self.message_type == MessageType.YES:
-                            print(f"TODO： send confirm message. {message_received.getContent()}")
-                            confirmed_message = Message(message_received.getContent(), MessageType.YES)
+                        if self.message_type == MessageType.YES:                            
+                            # create a private socket
+                            private_socket = socket(AF_INET, SOCK_STREAM)
+                            private_receive_thread = PrivateReceiveThread(private_socket, False)
+                            private_receive_thread.start()
+                            
+                            # add private thread in to private_receive_thread_list
+                            private_receive_thread_list.update({message_received.getContent()['requester'] : private_receive_thread})
+                            
+                            message = message_received.getContent()
+                            message.update({"private_address":private_socket.getsockname()})
+                            
+                            if debug : print(f"TODO： send confirm message. {message}")
+                            confirmed_message = Message(message, MessageType.YES)
                             self.clientSocket.send(pickle.dumps(confirmed_message))
+                            
                         elif self.message_type == MessageType.NO:
                             print(f"TODO： send refuse message.")
                             refused_message = Message(self.message_content, MessageType.NO)
@@ -122,16 +141,30 @@ class SendThread(Thread):
                         self.clientSocket.close()
                         os._exit(0)
                     elif self.message_type == MessageType.STARTPRIVATE:
-                        print(f"TODO： send start private. {self.message_content} {self.message_type}")
                         # ask server to send request
                         startprivate_message = Message(self.message_content, MessageType.STARTPRIVATE)
                         self.clientSocket.send(pickle.dumps(startprivate_message))
                         continue
                     elif self.message_type == MessageType.PRIVATE:
-                        print("TODO： send private.")
+                        target_user = self.message_content['user']
+                        message_content = self.message_content['message']
+                        
+                        message = Message(message_content, self.message_type)
+                        
+                        if target_user in private_send_thread_list.keys():
+                            send_thread = private_send_thread_list[target_user]
+                            send_thread.sendmessage(message)
+                        else:
+                            print(f"=== Error : Private messaging to {target_user} not enabled.")
                         continue
                     elif self.message_type == MessageType.STOPPRIVATE:
-                        print("TODO： send stop private.")
+                        target_user = self.message_content['user']
+                        if target_user in private_receive_thread_list.keys() and target_user in private_send_thread_list.keys():
+                            del private_receive_thread_list[target_user]
+                            del private_send_thread_list[target_user]
+                            # TODO : send message to target user to let him stop private messaging
+                        else:
+                            print(f"=== Error : Stop Private messaging to {target_user} not enabled.")
                         continue
 
 class ReceiveThread(Thread):
@@ -165,6 +198,7 @@ class ReceiveThread(Thread):
             elif message_received.getType() == ServerMessageType.ANNONCEMENT:
                 # print the announcement from server
                 print(message_received.getContent())
+                continue
             elif message_received.getType() == ServerMessageType.TIMEOUT:
                 # print timeout message & terminate client
                 print(message_received.getContent())
@@ -185,15 +219,48 @@ class ReceiveThread(Thread):
                 if "already online" in message_received.getContent():
                     print("Please re-type your Username")
                     username = None
-            elif message_received.getType() == ServerMessageType.REQUEST_PRIVATE:
-                # print private request message
-                print(message_received.getContent())
+                continue
+            elif message_received.getType() == ServerMessageType.ASK_FOR_PRIVATE_CONNECTION:
                 print("enter y or n: ")
                 confirm_wait = True
-            elif message_received.getType() == ServerMessageType.SEND_ADDRESS:
+                continue
+            elif message_received.getType() == ServerMessageType.SEND_REQUESTER_SOCKET_ADDRESS:
                 # print target private_client_address
-                print(f"Got ClientAddress : {message_received.getContent()}")
-
+                if debug : print(f"Got ClientAddress : {message_received.getContent()}")
+                
+                # create private_socket
+                requester_socket_send = socket(AF_INET, SOCK_STREAM)
+                target_socket_address = message_received.getContent()['private_address']
+                requester_socket_send.connect(target_socket_address)
+                private_send_thread = PrivateSendThread(requester_socket_send)
+                
+                requester_socket_receive = socket(AF_INET, SOCK_STREAM)
+                private_receive_thread = PrivateReceiveThread(requester_socket_receive, False)
+                private_send_thread.start()
+                private_receive_thread.start()
+                
+                
+                private_send_thread_list.update({message_received.getContent()['target_user'] : private_send_thread})
+                private_receive_thread_list.update({message_received.getContent()['target_user'] : private_receive_thread})
+                if debug : print("sendthread list == ", private_send_thread_list)
+                if debug : print("receivethread list == ", private_receive_thread_list)
+                
+                ask_target_start_private_sender_thread_message = Message({"target_user" : message_received.getContent()['target_user'], "private_address":requester_socket_receive.getsockname()}, MessageType.TELL_TARGET_USER_SETUP_PRIVATE_SENDERTHREAD)
+                self.clientSocket.send(pickle.dumps(ask_target_start_private_sender_thread_message))
+                continue
+            elif message_received.getType() == ServerMessageType.SETUP_PRIVATE_SENDERTHREAD:
+                requester_username = message_received.getContent()['requester']
+                requester_private_address = message_received.getContent()['private_address']
+                
+                
+                requester_socket = socket(AF_INET, SOCK_STREAM)
+                requester_socket.connect(requester_private_address)
+                receivethread = PrivateSendThread(requester_socket)
+                receivethread.start()
+                
+                private_send_thread_list.update({requester_username:receivethread})
+                
+                continue
 
 # define sendThread and receiveThread
 receivethread = ReceiveThread(clientSocket)

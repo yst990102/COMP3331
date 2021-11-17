@@ -16,6 +16,7 @@ class MessageType(Enum):
     LOGOUT = 7
     
     STARTPRIVATE = 8
+    TELL_TARGET_USER_SETUP_PRIVATE_SENDERTHREAD = 8.1
     PRIVATE = 9
     STOPPRIVATE = 10
     
@@ -32,8 +33,9 @@ class ServerMessageType(Enum):
     TIMEOUT = 104
     ACCOUNT_BLOCK = 105
     
-    REQUEST_PRIVATE = 106
-    SEND_ADDRESS = 107
+    ASK_FOR_PRIVATE_CONNECTION = 106
+    SEND_REQUESTER_SOCKET_ADDRESS = 107
+    SETUP_PRIVATE_SENDERTHREAD = 108
 
 
 class Message(object):

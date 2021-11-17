@@ -18,7 +18,7 @@ from helperfunctions import AddUserDataToTXT, InitializeBlockerList, InitializeS
 
 
 # debug
-debug = 1
+debug = 0
 
 
 # acquire server host and port from command line parameter
@@ -72,7 +72,10 @@ stored_message_list = InitializeStoredMessageList(UserData)
     for client-2. Each client will be runing in a separate therad, which is the multi-threading
 """
 class ClientThread(Thread):
+    
     def __init__(self, clientAddress, clientSocket:socket):
+        global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
+        
         Thread.__init__(self)
         self.clientAddress = clientAddress
         self.clientSocket = clientSocket
@@ -86,8 +89,9 @@ class ClientThread(Thread):
 
     
     def run(self):
-        self.message = ''
+        global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
         
+        self.message = ''
         while self.clientAlive:
             # use recv() to receive message from the client
             try:
@@ -98,7 +102,7 @@ class ClientThread(Thread):
                 print("Socket Timeout. current time == ", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                 self.process_timeout()
                 break
-            except EOFError:
+            except EOFError or ConnectionResetError:
                 print(f"Connection {self.clientAddress} was shut down.")
                 break
 
@@ -149,35 +153,40 @@ class ClientThread(Thread):
                 self.process_logout()
                 continue
             elif self.message_type == MessageType.STARTPRIVATE:
-                print(f"TODO: received startprivate message from {self.username}")
+                print(f"[recv] received startprivate message from {self.username}")
                 self.process_startprivate()
-                continue
-            elif self.message_type == MessageType.PRIVATE:
                 continue
             elif self.message_type == MessageType.STOPPRIVATE:
                 continue
             elif self.message_type == MessageType.YES:
-                if debug: print("[recv] Private requset has been confirmed.")
+                print("[request] Request has been confirmed!")
                 if debug: print(f"self.message_content == {self.message_content}")
                 # search for requester thread
                 for thread in clientThread_list:
                     if thread.login == True:
                         if thread.username == self.message_content['requester']:
-                            confirmed_feedback = ServerMessage(f"{self.username} has confirmed your request. address = {clientAddress}", ServerMessageType.ANNONCEMENT)
+                            confirmed_feedback = ServerMessage(f"{self.username} has confirmed your request.", ServerMessageType.ANNONCEMENT)
                             thread.clientSocket.send(pickle.dumps(confirmed_feedback))
                             
                             # send feedback to requester
-                            requester_feedback = ServerMessage({"address":clientAddress}, ServerMessageType.SEND_ADDRESS)
+                            requester_feedback = ServerMessage({"target_user": self.username, "private_address":self.message_content['private_address']}, ServerMessageType.SEND_REQUESTER_SOCKET_ADDRESS)
                             thread.clientSocket.send(pickle.dumps(requester_feedback))
-                            
-                            # send feedback to targetuser
-                            targetuser_feedback = ServerMessage({"address":thread.clientAddress}, ServerMessageType.SEND_ADDRESS)
-                            self.clientSocket.send(pickle.dumps(targetuser_feedback))
                             break
                 continue
             elif self.message_type == MessageType.NO:
-                if debug: print("[recv] Private requset has been refused.")
+                print("[request] Request has been refused!")
+                # TODO: tell requester that his requeset has been refused.
                 continue
+            elif self.message_type == MessageType.TELL_TARGET_USER_SETUP_PRIVATE_SENDERTHREAD:
+                target_username = self.message_content['target_user']
+                requester_socket_address = self.message_content['private_address']
+                for thread in clientThread_list:
+                    if thread.login == True:
+                        if thread.username == target_username and thread.is_alive():
+                            if self.username not in blocker_list[thread.username]:      # only when you are not in that user's block list
+                                ask_message = ServerMessage({"requester":self.username, "private_address":requester_socket_address}, ServerMessageType.SETUP_PRIVATE_SENDERTHREAD)
+                                thread.clientSocket.send(pickle.dumps(ask_message))
+                        
     """
         You can create more customized APIs here, e.g., logic for processing user authentication
         Each api can be used to handle one specific function, for example:
@@ -186,6 +195,8 @@ class ClientThread(Thread):
             self.clientSocket.send(message.encode())
     """    
     def process_login(self):
+        global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
+        
         self.username = self.message_content['username']
         # if user is already online
         is_user_online = False
@@ -214,6 +225,8 @@ class ClientThread(Thread):
             self.clientSocket.send(pickle.dumps(passwd_request))
 
     def process_login_olduser(self):
+        global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
+        
         self.passwd = self.message_content['password']
         
         # print recv message in server
@@ -223,7 +236,7 @@ class ClientThread(Thread):
         if UserData[self.username] == self.passwd:
             print("[check] Password Correct.")
 
-            # login_broadcast
+            # login_success
             self.process_login_success()
             return
         else:
@@ -245,16 +258,26 @@ class ClientThread(Thread):
             return
     
     def process_login_newuser(self):
+        global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
+        
         self.passwd = self.message_content['newpassword']
         print("[recv] new password = %s" %self.passwd)
         
         # add new user data into USERDATA and TXT
         AddUserDataToTXT('credentials.txt', {"username":self.username, "password":self.passwd})
-        UserData.update({"username":self.username, "password":self.passwd})
+        UserData = LoadUserData('credentials.txt')
+        blocker_list = InitializeBlockerList(UserData)
+        stored_message_list = InitializeStoredMessageList(UserData)
+        
         print("[check] New User Added. Successfully Login!")
+
+        # login_success
+        self.process_login_success()
         return
 
     def process_login_success(self):
+        global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
+        
         self.login = True
         self.clientSocket.settimeout(timeout_duration)
 
@@ -298,6 +321,8 @@ class ClientThread(Thread):
         return
 
     def process_login_broadcast(self):
+        global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
+        
         for thread in clientThread_list:
             # only tell the online people
             if thread.login == True:
@@ -309,6 +334,8 @@ class ClientThread(Thread):
         return
 
     def IsUserAccouBlocked(self, checked_user):
+        global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
+        
         # if user is still blocked , continue
         is_user_blocked = False
         for (user, timer) in login_blocked_list:
@@ -320,6 +347,8 @@ class ClientThread(Thread):
         return is_user_blocked
 
     def process_message(self):
+        global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
+        
         target_user = self.message_content["user"]
         # validate the targer user
         if target_user not in UserData.keys():
@@ -351,6 +380,8 @@ class ClientThread(Thread):
             stored_message_list[target_user].append(message_stored)
     
     def process_broadcast(self):
+        global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
+        
         print("[broadcast] " + self.username + " is broadcasting \"%s\"" %self.message_content["message"])        
         
         for target_user in UserData.keys():
@@ -403,6 +434,8 @@ class ClientThread(Thread):
                     continue
     
     def process_whoelse(self):
+        global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
+        
         for (username, login_time) in OnLine_list:
             if username != self.username:
                 if self.username not in blocker_list[username]:     # only when you are not in that user's block list
@@ -411,6 +444,8 @@ class ClientThread(Thread):
         return
     
     def process_whoelsesince(self):
+        global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
+        
         time_now = datetime.datetime.now()
         time_now_stamp = time.mktime(time_now.timetuple())
         
@@ -431,6 +466,8 @@ class ClientThread(Thread):
         return
     
     def process_block(self):
+        global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
+        
         blocked_user = self.message_content["user"]
         print(f"[block] {self.username} is blocking {blocked_user}")    # print info on server
         
@@ -466,6 +503,8 @@ class ClientThread(Thread):
         return
     
     def process_unblock(self):
+        global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
+        
         unblocked_user = self.message_content["user"]
         print(f"[unblock] {self.username} is unblocking {unblocked_user}")
 
@@ -501,6 +540,8 @@ class ClientThread(Thread):
         return
     
     def process_logout(self):
+        global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
+        
         # get logout message, print diconnected announcement
         self.clientAlive = False
         print(f"===== {self.username} disconnected - {self.clientAddress}")
@@ -513,6 +554,8 @@ class ClientThread(Thread):
         return
 
     def process_logout_broadcast(self):
+        global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
+        
         # broadcast logout message to all unblocked user
         for thread in clientThread_list:
             # only tell the online people
@@ -525,6 +568,8 @@ class ClientThread(Thread):
                         thread.clientSocket.send(pickle.dumps(broadcast_message))
 
     def process_timeout(self):
+        global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
+        
         # send timeout server reply
         timeout_message = ServerMessage("Timeout ! Client has been terminated.", ServerMessageType.TIMEOUT)
         self.clientSocket.send(pickle.dumps(timeout_message))
@@ -533,6 +578,8 @@ class ClientThread(Thread):
         return
     
     def process_startprivate(self):
+        global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
+        
         target_user = self.message_content["user"]
         for thread in clientThread_list:
             if thread.login:
@@ -544,7 +591,7 @@ class ClientThread(Thread):
                     
                     time.sleep(0.01)
                     
-                    startprivate_message = ServerMessage({'requester':self.username}, ServerMessageType.REQUEST_PRIVATE)
+                    startprivate_message = ServerMessage({'requester':self.username}, ServerMessageType.ASK_FOR_PRIVATE_CONNECTION)
                     thread.clientSocket.send(pickle.dumps(startprivate_message))
                     
                     return

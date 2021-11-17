@@ -8,7 +8,7 @@ if __name__ == "__main__":
     clientaddress01 = ("127.0.0.1", 13005)
     client01.bind(clientaddress01)
     
-    client01.connect(("127.0.0.1", 13007))
+    client01.connect(("127.0.0.1", 13017))
     
     print("connection set up")
     
@@ -20,5 +20,7 @@ if __name__ == "__main__":
     print(data.decode())
     
     sleep(1)
+    
+    print(client01.getsockname())
     
     client01.close()
