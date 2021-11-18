@@ -64,8 +64,10 @@ def MessageContentByType(input_message:str):
         # argument error
         if len(input_list) != 2:
             return [{}, MessageType.ARGUMENT_ERROR]
-        
-        time = int(input_list[1])
+        try:
+            time = int(input_list[1])
+        except ValueError:
+            return [{}, MessageType.ARGUMENT_ERROR]
         return [{"time":time}, message_type]
     elif message_type == MessageType.BLOCK:
         # argument error
