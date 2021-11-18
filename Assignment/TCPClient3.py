@@ -49,16 +49,14 @@ private_send_thread_list = {}
 private_receive_thread_list = {}
 
 class PrivateReceiveThread(Thread):
-    def __init__(self, private_socket:socket, skip_listen:bool):
+    def __init__(self, private_socket:socket):
         Thread.__init__(self)
         self.private_socket = private_socket
-        self.skip_listen = skip_listen
         
     def run(self):
-        if self.skip_listen == False:
-            self.private_socket.listen()
-            self.target_socket, self.target_address = self.private_socket.accept()
-        # print("PrivateReceiveThread set up.")
+        self.private_socket.listen()
+        self.target_socket, self.target_address = self.private_socket.accept()
+
         self.message = ''
         while True:
             try:
@@ -112,7 +110,7 @@ class SendThread(Thread):
                     if self.message_type == MessageType.YES:
                         # create a private socket
                         private_socket = socket(AF_INET, SOCK_STREAM)
-                        private_receive_thread = PrivateReceiveThread(private_socket, False)
+                        private_receive_thread = PrivateReceiveThread(private_socket)
                         private_receive_thread.start()
                         
                         # add private thread in to private_receive_thread_list
@@ -276,7 +274,7 @@ class ReceiveThread(Thread):
                 private_send_thread = PrivateSendThread(requester_socket_send)
                 
                 requester_socket_receive = socket(AF_INET, SOCK_STREAM)
-                private_receive_thread = PrivateReceiveThread(requester_socket_receive, False)
+                private_receive_thread = PrivateReceiveThread(requester_socket_receive)
                 private_send_thread.start()
                 private_receive_thread.start()
                 
