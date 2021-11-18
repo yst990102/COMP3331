@@ -82,7 +82,7 @@ class PrivateSendThread(Thread):
         return
         
     def sendmessage(self,message:str):
-        self.private_socket.send(pickle.dumps(message))
+        self.private_socket.sendall(pickle.dumps(message))
         
     def getSocket(self):
         return self.private_socket
@@ -122,14 +122,14 @@ class SendThread(Thread):
                         message.update({"private_address":private_socket.getsockname()})
                         
                         confirmed_message = Message(message, MessageType.YES)
-                        self.clientSocket.send(pickle.dumps(confirmed_message))
+                        self.clientSocket.sendall(pickle.dumps(confirmed_message))
                         
                         # remove the confirmed requester
                         del requester_list[0]
                     elif self.message_type == MessageType.NO:
                         print(f"You refused the request.")
                         refused_message = Message({"requester" : requester_list[0]}, MessageType.NO)
-                        self.clientSocket.send(pickle.dumps(refused_message))
+                        self.clientSocket.sendall(pickle.dumps(refused_message))
                         
                         # remove the confirmed requester
                         del requester_list[0]
@@ -146,32 +146,32 @@ class SendThread(Thread):
                     continue
                 elif self.message_type == MessageType.MESSAGE:
                     messaged_message = Message(self.message_content, MessageType.MESSAGE)
-                    self.clientSocket.send(pickle.dumps(messaged_message))
+                    self.clientSocket.sendall(pickle.dumps(messaged_message))
                     continue
                 elif self.message_type == MessageType.BROADCAST:
                     broadcast_message = Message(self.message_content, MessageType.BROADCAST)
-                    self.clientSocket.send(pickle.dumps(broadcast_message))
+                    self.clientSocket.sendall(pickle.dumps(broadcast_message))
                     continue
                 elif self.message_type == MessageType.WHOELSE:
                     whoelse_message = Message(self.message_content, MessageType.WHOELSE)
-                    self.clientSocket.send(pickle.dumps(whoelse_message))
+                    self.clientSocket.sendall(pickle.dumps(whoelse_message))
                     continue
                 elif self.message_type == MessageType.WHOELSESINCE:
                     whoelsesince_message = Message(self.message_content, MessageType.WHOELSESINCE)
-                    self.clientSocket.send(pickle.dumps(whoelsesince_message))
+                    self.clientSocket.sendall(pickle.dumps(whoelsesince_message))
                     continue
                 elif self.message_type == MessageType.BLOCK:
                     block_message = Message(self.message_content, MessageType.BLOCK)
-                    self.clientSocket.send(pickle.dumps(block_message))
+                    self.clientSocket.sendall(pickle.dumps(block_message))
                     continue
                 elif self.message_type == MessageType.UNBLOCK:
                     block_message = Message(self.message_content, MessageType.UNBLOCK)
-                    self.clientSocket.send(pickle.dumps(block_message))
+                    self.clientSocket.sendall(pickle.dumps(block_message))
                     continue
                 elif self.message_type == MessageType.LOGOUT:
                     # tell server that client has logout
                     logout_message = Message(self.message_content, MessageType.LOGOUT)
-                    self.clientSocket.send(pickle.dumps(logout_message))
+                    self.clientSocket.sendall(pickle.dumps(logout_message))
                     
                     # print logout message & terminate client
                     print("Log out successfullly.")
@@ -189,7 +189,7 @@ class SendThread(Thread):
                     else:
                         # ask server to send request
                         startprivate_message = Message(self.message_content, MessageType.STARTPRIVATE)
-                        self.clientSocket.send(pickle.dumps(startprivate_message))
+                        self.clientSocket.sendall(pickle.dumps(startprivate_message))
                         continue
                 elif self.message_type == MessageType.PRIVATE:
                     target_user = self.message_content['user']
@@ -214,7 +214,7 @@ class SendThread(Thread):
                         # TODO : send message to target user to let him stop private messaging
                         stopprivate_message_content = {"deluser" : username, "user" : target_user}
                         stopprivate_message = Message(stopprivate_message_content, MessageType.STOPPRIVATE)
-                        self.clientSocket.send(pickle.dumps(stopprivate_message))
+                        self.clientSocket.sendall(pickle.dumps(stopprivate_message))
                         continue
                     else:
                         print(f"=== Error : Stop Private messaging with {target_user} not enabled. Target logged out or No private tunnel setup.")
@@ -285,7 +285,7 @@ class ReceiveThread(Thread):
                 private_receive_thread_list.update({message_received.getContent()['target_user'] : private_receive_thread})
 
                 ask_target_start_private_sender_thread_message = Message({"target_user" : message_received.getContent()['target_user'], "private_address":requester_socket_receive.getsockname()}, MessageType.TELL_TARGET_USER_SETUP_PRIVATE_SENDERTHREAD)
-                self.clientSocket.send(pickle.dumps(ask_target_start_private_sender_thread_message))
+                self.clientSocket.sendall(pickle.dumps(ask_target_start_private_sender_thread_message))
                 continue
             elif message_received.getType() == ServerMessageType.SETUP_PRIVATE_SENDERTHREAD:
                 requester_username = message_received.getContent()['requester']
@@ -309,7 +309,7 @@ class ReceiveThread(Thread):
                 # print private stopped message and send confirmed stopped message to server
                 print(f"Private messaging was stopped by {deluser}")
                 stopped_message = Message({"deleteduser" : deluser}, MessageType.STOPPRIVATE_PRIVATE_STOPPED)
-                self.clientSocket.send(pickle.dumps(stopped_message))
+                self.clientSocket.sendall(pickle.dumps(stopped_message))
                 continue
             elif message_received.getType() == ServerMessageType.STOPPED_PRIVATE_CONFIRM:
                 # print feedback message
@@ -326,7 +326,7 @@ receivethread.start()
 
 username = input("Username: ")
 username_message = Message({'username' : username}, MessageType.LOGIN_USERNAME)
-clientSocket.send(pickle.dumps(username_message))
+clientSocket.sendall(pickle.dumps(username_message))
 
 while True:
     
@@ -336,12 +336,12 @@ while True:
     if message_received.getType() == ServerMessageType.REQUEST_NEEDPASSWORD:
         password = input(message_received.getContent() + "Password: ")
         password_message = Message({"password":password}, MessageType.LOGIN_PASSWD)
-        clientSocket.send(pickle.dumps(password_message))                    # send out password
+        clientSocket.sendall(pickle.dumps(password_message))                    # send out password
         continue
     elif message_received.getType() == ServerMessageType.REQUEST_NEWUSER:
         password = input(message_received.getContent() + "Enter a password: ")
         password_message = Message({"newpassword":password}, MessageType.LOGIN_NEWPASSWD)
-        clientSocket.send(pickle.dumps(password_message))                    # send out password
+        clientSocket.sendall(pickle.dumps(password_message))                    # send out password
         break
     elif message_received.getType() == ServerMessageType.ERROR:
         username = input()
