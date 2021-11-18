@@ -143,6 +143,10 @@ class SendThread(Thread):
                     print("=== Error : Invalid command ===")
                     continue
                 elif self.message_type == MessageType.MESSAGE:
+                    user = self.message_content['user']
+                    if user == username:
+                        print(f"=== Error : Messaging youself is not allowed. ")
+                        continue
                     messaged_message = Message(self.message_content, MessageType.MESSAGE)
                     self.clientSocket.sendall(pickle.dumps(messaged_message))
                     continue
