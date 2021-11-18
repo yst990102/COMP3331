@@ -459,6 +459,7 @@ class ClientThread(Thread):
         global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
         
         time_now = datetime.datetime.now()
+        print(f"[Whoelsesince] : CurrentTime - {time_now.strftime('%Y-%m-%d %H:%M:%S')}")
         time_now_stamp = time.mktime(time_now.timetuple())
         
         required_time_diff = self.message_content["time"]
