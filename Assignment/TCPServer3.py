@@ -226,11 +226,13 @@ class ClientThread(Thread):
         # new : ask for passwd, send request_newuser
         if self.username in UserData.keys():
             if server_print : print("[recv] User already exists!! Check password!!")
+            time.sleep(0.01)
             # request for password checking
             passwd_request = ServerMessage("This is a old user. ", ServerMessageType.REQUEST_NEEDPASSWORD)
             self.clientSocket.sendall(pickle.dumps(passwd_request))
         else:
             if server_print : print("[recv] New User, please create password!")
+            time.sleep(0.01)
             # request for new password
             passwd_request = ServerMessage("This is a new user. ", ServerMessageType.REQUEST_NEWUSER)
             self.clientSocket.sendall(pickle.dumps(passwd_request))
@@ -312,6 +314,9 @@ class ClientThread(Thread):
         
         # return all the stored message to the client        
         if stored_message_list[self.username] != []:
+            
+            time.sleep(0.01)    # add interval time between continous message sending
+            
             stored_split_line1 = ServerMessage("\n************* Here is your stored messages *************", ServerMessageType.ANNONCEMENT)
             self.clientSocket.sendall(pickle.dumps(stored_split_line1))
             
@@ -343,6 +348,7 @@ class ClientThread(Thread):
                         broadcast_message_content = self.username + " logged in"
                         broadcast_message = ServerMessage(broadcast_message_content, ServerMessageType.ANNONCEMENT)
                         thread.clientSocket.sendall(pickle.dumps(broadcast_message))
+                        time.sleep(0.01)    # add interval time between continous message sending
         return
 
     def IsUserAccouBlocked(self, checked_user):
@@ -653,7 +659,7 @@ class ClientThread(Thread):
                     return
         error_message_content = f"Stop private messaging confirmation can not be send back to {feedback_user}"
         error_message = ServerMessage(error_message_content, ServerMessageType.ERROR)
-        self.clientSocket.send(error_message)
+        self.clientSocket.sendall(pickle.dumps(error_message))
         return
     
     
