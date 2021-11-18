@@ -31,41 +31,91 @@ def InitializeStoredMessageList(userdata:dict):
 
 def MessageContentByType(input_message:str):
     input_list = input_message.split(" ")
+    input_list = list(filter(None, input_list)) # remove none and empty string in list
+    
     message_type = StringToMessageType(input_list[0])
     
     if message_type == MessageType.MESSAGE:
+        # argument error
+        if len(input_list) < 3:
+            return [{}, MessageType.ARGUMENT_ERROR]
+
         user = input_list[1]
         message = " ".join(input_list[2:])
         return [{"user":user, "message":message}, message_type]
     elif message_type == MessageType.BROADCAST:
+        # argument error
+        if len(input_list) < 2:
+            return [{}, MessageType.ARGUMENT_ERROR]
+        
         message = " ".join(input_list[1:])
         return [{"message":message}, message_type]
     elif message_type == MessageType.WHOELSE:
+        # argument error
+        if len(input_list) != 1:
+            return [{}, MessageType.ARGUMENT_ERROR]
+        
         return [{}, message_type]
     elif message_type == MessageType.WHOELSESINCE:
+        # argument error
+        if len(input_list) != 2:
+            return [{}, MessageType.ARGUMENT_ERROR]
+        
         time = int(input_list[1])
         return [{"time":time}, message_type]
     elif message_type == MessageType.BLOCK:
+        # argument error
+        if len(input_list) != 2:
+            return [{}, MessageType.ARGUMENT_ERROR]
+        
         user = input_list[1]
         return [{"user":user}, message_type]
     elif message_type == MessageType.UNBLOCK:
+        # argument error
+        if len(input_list) != 2:
+            return [{}, MessageType.ARGUMENT_ERROR]
+        
         user = input_list[1]
         return [{"user":user}, message_type]
     elif message_type == MessageType.LOGOUT:
+        # argument error
+        if len(input_list) != 1:
+            return [{}, MessageType.ARGUMENT_ERROR]
+        
         return [{}, message_type]
     elif message_type == MessageType.STARTPRIVATE:
+        # argument error
+        if len(input_list) != 2:
+            return [{}, MessageType.ARGUMENT_ERROR]
+        
         user = input_list[1]
         return [{"user":user}, message_type]
     elif message_type == MessageType.PRIVATE:
+        # argument error
+        if len(input_list) < 3:
+            return [{}, MessageType.ARGUMENT_ERROR]
+        
         user = input_list[1]
         message = " ".join(input_list[2:])
         return [{"user":user, "message":message}, message_type]
     elif message_type == MessageType.STOPPRIVATE:
+        # argument error
+        if len(input_list) != 2:
+            return [{}, MessageType.ARGUMENT_ERROR]
+        
         user = input_list[1]
         return [{"user":user}, message_type]
     elif message_type == MessageType.YES:
+        # argument error
+        if len(input_list) != 1:
+            return [{}, MessageType.ARGUMENT_ERROR]
+        
         return [{}, message_type]
     elif message_type == MessageType.NO:
+        # argument error
+        if len(input_list) != 1:
+            return [{}, MessageType.ARGUMENT_ERROR]
+        
         return [{}, message_type]
     elif message_type == MessageType.NOCOMMAND:
         return [{}, message_type]

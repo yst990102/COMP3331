@@ -2,6 +2,7 @@ from enum import Enum
 
 class MessageType(Enum):
     NOCOMMAND = -1
+    ARGUMENT_ERROR = -2
 
     LOGIN_USERNAME = 0.1
     LOGIN_PASSWD = 0.2

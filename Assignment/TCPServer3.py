@@ -17,6 +17,9 @@ from TimeThread import TimeThread
 from helperfunctions import AddUserDataToTXT, InitializeBlockerList, InitializeStoredMessageList, LoadUserData
 
 
+# server print
+server_print = 1
+
 # debug
 debug = 0
 
@@ -84,7 +87,7 @@ class ClientThread(Thread):
         self.login = False
         self.clientAlive = False
         
-        print("===== New connection created for: ", clientAddress)
+        if server_print : print("===== New connection created for: ", clientAddress)
         self.clientAlive = True
 
     
@@ -99,11 +102,11 @@ class ClientThread(Thread):
                 self.message = pickle.loads(data)
             except timeout:
                 # auto logout when timeout reached
-                print("Socket Timeout. current time == ", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                if server_print : print("[Timeout] Current time == ", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                 self.process_timeout()
                 break
             except EOFError or ConnectionResetError:
-                print(f"Connection {self.clientAddress} was shut down.")
+                if server_print : print(f"===== Connection {self.clientAddress} was shut down.")
                 self.process_logout()
                 break
 
@@ -115,9 +118,6 @@ class ClientThread(Thread):
                 if timer.is_alive() == False:
                     login_blocked_list.remove((user, timer))
 
-            
-            if debug: print("Processing: %s" % self.message_content)
-            if debug: print(OnLine_list)
             
             if self.message_type == MessageType.LOGIN_USERNAME:                
                 # if user is still blocked , continue
@@ -154,7 +154,7 @@ class ClientThread(Thread):
                 self.process_logout()
                 continue
             elif self.message_type == MessageType.STARTPRIVATE:
-                print(f"[recv] received startprivate message from {self.username}")
+                if server_print : print(f"[recv] received startprivate message from {self.username}")
                 self.process_startprivate()
                 continue
             elif self.message_type == MessageType.STOPPRIVATE:
@@ -164,8 +164,7 @@ class ClientThread(Thread):
                 self.process_stopped_private_feedback()
                 continue
             elif self.message_type == MessageType.YES:
-                print("[request] Request has been confirmed!")
-                if debug: print(f"self.message_content == {self.message_content}")
+                if server_print : print("[Request] Request has been confirmed!")
                 # search for requester thread
                 for thread in clientThread_list:
                     if thread.login == True:
@@ -179,8 +178,16 @@ class ClientThread(Thread):
                             break
                 continue
             elif self.message_type == MessageType.NO:
-                print("[request] Request has been refused!")
-                # TODO: tell requester that his requeset has been refused.
+                if server_print : print("[Request] Request has been refused!")
+                
+                # tell requester that his requeset has been refused.
+                requester = self.message_content['requester']
+                for thread in clientThread_list:
+                    if thread.login == True:
+                        if thread.username == requester:
+                            refused_feedback = ServerMessage(f"{self.username} has refused your request.", ServerMessageType.ANNONCEMENT)
+                            thread.clientSocket.send(pickle.dumps(refused_feedback))
+                            break
                 continue
             elif self.message_type == MessageType.TELL_TARGET_USER_SETUP_PRIVATE_SENDERTHREAD:
                 target_username = self.message_content['target_user']
@@ -207,24 +214,22 @@ class ClientThread(Thread):
         is_user_online = False
         for user in OnLine_list[:]:
             if user[0] == self.username:
-                print(f"=== CHECK ===== {user[0]} {self.username}")
                 # user is already online
                 online_error = ServerMessage(f"{self.username} is already online.", ServerMessageType.ERROR)
                 self.clientSocket.send(pickle.dumps(online_error))
                 is_user_online = True
-                print("SEND ERROR MESSAGE")
         if is_user_online == True: return
         
         # check if user is old or new
         # old : ask for passwd, send request_needpassword
         # new : ask for passwd, send request_newuser
         if self.username in UserData.keys():
-            print("[recv] User already exists!! Check password!!")
+            if server_print : print("[recv] User already exists!! Check password!!")
             # request for password checking
             passwd_request = ServerMessage("This is a old user. ", ServerMessageType.REQUEST_NEEDPASSWORD)
             self.clientSocket.send(pickle.dumps(passwd_request))
         else:
-            print("[recv] New User, please create password!")
+            if server_print : print("[recv] New User, please create password!")
             # request for new password
             passwd_request = ServerMessage("This is a new user. ", ServerMessageType.REQUEST_NEWUSER)
             self.clientSocket.send(pickle.dumps(passwd_request))
@@ -235,18 +240,19 @@ class ClientThread(Thread):
         self.passwd = self.message_content['password']
         
         # print recv message in server
-        print("[recv] password = %s" %self.passwd)
+        if server_print : print("[recv] password = %s" %self.passwd)
         
         # check password correction
         if UserData[self.username] == self.passwd:
-            print("[check] Password Correct.")
+            if server_print : print("[check] Password Correct.")
 
             # login_success
             self.process_login_success()
             return
         else:
-            print("[check] Invalid Password. Please Re-type Password.")
-            print("attempts == %d" %self.attempts)
+            if server_print : print("[check] Invalid Password. Please Re-type Password.")
+            if debug : print("attempts == %d" %self.attempts)
+            
             self.attempts += 1
             if self.attempts == 3:
                 # start a timethread for block counting
@@ -266,7 +272,7 @@ class ClientThread(Thread):
         global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
         
         self.passwd = self.message_content['newpassword']
-        print("[recv] new password = %s" %self.passwd)
+        if server_print : print("[recv] new password = %s" %self.passwd)
         
         # add new user data into USERDATA and TXT
         AddUserDataToTXT('credentials.txt', {"username":self.username, "password":self.passwd})
@@ -274,7 +280,7 @@ class ClientThread(Thread):
         blocker_list.update({self.username:[]})
         stored_message_list.update({self.username:[]})
         
-        print("[check] New User Added. Successfully Login!")
+        if server_print : print("[check] New User Added. Successfully Login!")
 
         # login_success
         self.process_login_success()
@@ -292,10 +298,8 @@ class ClientThread(Thread):
         Log_history.append(login_info)
         
         # print success login in info on server
-        print("[check] Successfully Login! Time - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))    # print login finished & time 
-        
-        if debug: print("login_blocked_list == ",login_blocked_list)
-        
+        if server_print : print("[check] Successfully Login! Time - " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))    # print login finished & time 
+
         # return welcome message to the client
         login_success_message_content = """
     =========================================================================
@@ -305,7 +309,6 @@ class ClientThread(Thread):
         login_success_message = ServerMessage(login_success_message_content, ServerMessageType.ANNONCEMENT)
         self.clientSocket.send(pickle.dumps(login_success_message))
         
-        if debug: print(stored_message_list[self.username])
         # return all the stored message to the client        
         if stored_message_list[self.username] != []:
             stored_split_line1 = ServerMessage("\n************* Here is your stored messages *************", ServerMessageType.ANNONCEMENT)
@@ -315,7 +318,7 @@ class ClientThread(Thread):
             
             stored_messages = stored_message_list[self.username]
             for stored_message in stored_messages[:]:
-                if debug : print(f"[loading stored message] message content == {stored_message.getContent()}, type == {stored_message.getType()}")
+                if server_print : print(f"[Loading Stored Message] message content == {stored_message.getContent()}, type == {stored_message.getType()}")
                 self.clientSocket.send(pickle.dumps(stored_message))
                 stored_message_list[self.username].remove(stored_message)   # remove the stored message that have been re-sent
                 time.sleep(0.01)    # add interval time between continous message sending
@@ -360,15 +363,15 @@ class ClientThread(Thread):
         target_user = self.message_content["user"]
         # validate the targer user
         if target_user not in UserData.keys():
-            print(f"[Error] : {target_user} is not a registered user.")
-            target_invalid_content = f"Invalid user. There is no \"{target_user}\" in registered user."
+            if server_print : print(f"[Error] : '{target_user}' is not a registered user.")
+            target_invalid_content = f"Invalid user. There is no '{target_user}' in registered user."
             target_invalid_message = ServerMessage(target_invalid_content, ServerMessageType.ERROR)
             self.clientSocket.send(pickle.dumps(target_invalid_message))
             return
         
         # when you are in the target's block list, you can't send message to your target
         if self.username in blocker_list[target_user]:
-            print(f"[Announcement] : The requester is blocked by {target_user}.")
+            if server_print : print(f"[Announcement] : The requester is blocked by '{target_user}'.")
             stop_sending_content = f"Your message could not be delivered as the recipient has blocked you."
             stop_sending_message = ServerMessage(stop_sending_content, ServerMessageType.ANNONCEMENT)
             self.clientSocket.send(pickle.dumps(stop_sending_message))
@@ -379,7 +382,7 @@ class ClientThread(Thread):
             for thread in clientThread_list:
                 if thread.login == True:
                     if thread.username == target_user and thread.is_alive():
-                        print(f"[Messaging] : send '{target_message}' from {self.username} to {target_user}")
+                        if server_print : print(f"[Messaging] : send '{target_message}' from '{self.username}' to '{target_user}'")
                         message_content = f"[message] {self.username} : {target_message}"
                         message_send = ServerMessage(message_content, ServerMessageType.ANNONCEMENT)
                         thread.clientSocket.send(pickle.dumps(message_send))
@@ -388,13 +391,13 @@ class ClientThread(Thread):
             stored_message_content = f"[message] {self.username} : {target_message}"
             message_stored = ServerMessage(stored_message_content, ServerMessageType.ANNONCEMENT)
             stored_message_list[target_user].append(message_stored)
-            print("Storing == ",stored_message_content)
+            if server_print : print("[store] Storing message")
             return
     
     def process_broadcast(self):
         global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
         
-        print("[broadcast] " + self.username + " is broadcasting \"%s\"" %self.message_content["message"])        
+        if server_print : print(f"[broadcast] {self.username} is broadcasting {self.message_content['message']}")        
         
         for target_user in UserData.keys():
             # do not send broadcst message to myself
@@ -412,7 +415,7 @@ class ClientThread(Thread):
                     break
             
             if is_user_online == True:
-                if debug : print(f"[broadcast] {target_user} is currently online")
+                if server_print : print(f"[broadcast] {target_user} is currently online")
                 # check if self.user is block by target_user
                 if self.username in blocker_list[target_user]:      # online but blocked you, return
                     # tell self.user that somebody has blocked you
@@ -427,10 +430,10 @@ class ClientThread(Thread):
                                 broadcast_message_content = f"[broadcast] {self.username} : " + self.message_content["message"]
                                 broadcast_message = ServerMessage(broadcast_message_content, ServerMessageType.ANNONCEMENT)
                                 thread.clientSocket.send(pickle.dumps(broadcast_message))
-                                if debug : print(f"[broadcast] send message '{broadcast_message_content}' to {target_user} successfully.")
+                                if debug : print(f"[broadcast] send message '{broadcast_message_content}' to '{target_user}' successfully.")
                                 continue
             else:
-                if debug : print(f"[broadcast] {target_user} is currently offline")
+                if server_print : print(f"[broadcast] '{target_user}' is currently offline")
                 if self.username in blocker_list[target_user]:
                     # tell self.user that somebody has blocked you
                     blocked_message_content = "Your message could not be delivered to some recipients"
@@ -442,7 +445,7 @@ class ClientThread(Thread):
                     stored_message_content = f"[broadcast] {self.username} : " + self.message_content["message"]
                     message_stored = ServerMessage(stored_message_content, ServerMessageType.ANNONCEMENT)
                     stored_message_list[target_user].append(message_stored)
-                    if debug : print(f"[broadcast] store message '{stored_message_content}' for {target_user} successfully.")
+                    if debug : print(f"[broadcast] store message '{stored_message_content}' for '{target_user}' successfully.")
                     continue
     
     def process_whoelse(self):
@@ -459,7 +462,7 @@ class ClientThread(Thread):
         global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
         
         time_now = datetime.datetime.now()
-        print(f"[Whoelsesince] : CurrentTime - {time_now.strftime('%Y-%m-%d %H:%M:%S')}")
+        if server_print : print(f"[whoelsesince] : CurrentTime - {time_now.strftime('%Y-%m-%d %H:%M:%S')}")
         time_now_stamp = time.mktime(time_now.timetuple())
         
         required_time_diff = self.message_content["time"]
@@ -482,12 +485,12 @@ class ClientThread(Thread):
         global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
         
         blocked_user = self.message_content["user"]
-        print(f"[Block] {self.username} is blocking {blocked_user}")    # print info on server
+        if server_print : print(f"[block] {self.username} is blocking {blocked_user}")    # print info on server
         
         # validate the blocked_user
         if blocked_user not in UserData.keys():
             target_invalid_content = f"Invalid user"
-            print(f"[Block] block failed : " + target_invalid_content)  # print info on server
+            if server_print : print(f"[block] block failed : " + target_invalid_content)  # print info on server
 
             target_invalid_message = ServerMessage(target_invalid_content, ServerMessageType.ERROR)
             self.clientSocket.send(pickle.dumps(target_invalid_message))
@@ -496,7 +499,7 @@ class ClientThread(Thread):
         # normal case
         if self.username != blocked_user and blocked_user not in blocker_list[self.username]:
             blocker_list[self.username].append(blocked_user)    # append the user from blocker_list
-            print(f"[Block] block success !")                           # print info on server
+            if server_print : print(f"[block] block success !")                           # print info on server
             if debug : print(f"[block] Current blocker_list == {blocker_list}")    # print info on server
             
             blocked_message_content = f"{blocked_user} is blocked."
@@ -509,7 +512,7 @@ class ClientThread(Thread):
             # you can't block a blocked user
             elif blocked_user in blocker_list[self.username]:
                 error_message_content = f"{blocked_user} is already blocked."
-            print(f"[Block] block failed : " + error_message_content)   # print info on server
+            if server_print : print(f"[block] block failed : " + error_message_content)   # print info on server
             
             error_message = ServerMessage(error_message_content, ServerMessageType.ERROR)
             self.clientSocket.send(pickle.dumps(error_message))
@@ -519,12 +522,12 @@ class ClientThread(Thread):
         global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
         
         unblocked_user = self.message_content["user"]
-        print(f"[unblock] {self.username} is unblocking {unblocked_user}")
+        if server_print : print(f"[unblock] {self.username} is unblocking {unblocked_user}")
 
         # validate the unblocked_user
         if unblocked_user not in UserData.keys():
             target_invalid_content = f"Invalid user"
-            print(f"[unblock] unblock failed : " + target_invalid_content)  # print info on server
+            if server_print : print(f"[unblock] unblock failed : " + target_invalid_content)  # print info on server
             
             target_invalid_message = ServerMessage(target_invalid_content, ServerMessageType.ERROR)
             self.clientSocket.send(pickle.dumps(target_invalid_message))
@@ -533,8 +536,8 @@ class ClientThread(Thread):
         # normal case
         if self.username != unblocked_user and unblocked_user in blocker_list[self.username]:
             blocker_list[self.username].remove(unblocked_user)      # remove the user from blocker_list
-            print(f"[unblock] unblock success !")                           # print info on server
-            print(f"[unblock] Current blocker_list == {blocker_list}")    # print info on server
+            if server_print : print(f"[unblock] unblock success !")                           # print info on server
+            if debug : print(f"[unblock] Current blocker_list == {blocker_list}")    # print info on server
             
             unblocked_message_content = f"{unblocked_user} is unblocked."
             unblocked_message = ServerMessage(unblocked_message_content, ServerMessageType.ANNONCEMENT)
@@ -546,7 +549,7 @@ class ClientThread(Thread):
             # you can't unblock a non-blocked user
             elif unblocked_user not in blocker_list[self.username]:
                 error_message_content = f"{unblocked_user} was not blocked."
-            print(f"[unblock] unblock failed : " + error_message_content)   # print info on server
+            if server_print : print(f"[unblock] unblock failed : " + error_message_content)   # print info on server
             
             error_message = ServerMessage(error_message_content, ServerMessageType.ERROR)
             self.clientSocket.send(pickle.dumps(error_message))
@@ -557,13 +560,15 @@ class ClientThread(Thread):
         
         # get logout message, print diconnected announcement
         self.clientAlive = False
-        print(f"===== {self.username} disconnected - {self.clientAddress}")
+        if server_print : print(f"===== {self.username} disconnected - {self.clientAddress}")
         logout_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"===== Logout Time - {logout_time}")
+        if server_print : print(f"===== Logout Time - {logout_time}")
+        
         # remove user from online list
         for user in OnLine_list[:]:
             if user[0] == self.username:
                 OnLine_list.remove(user)
+                
         # log out broadcast
         self.process_logout_broadcast()
         return
@@ -599,9 +604,10 @@ class ClientThread(Thread):
         
         target_user = self.message_content["user"]
         for thread in clientThread_list:
-            if thread.login:
+            if thread.login == True:
                 if thread.username == target_user and thread.is_alive():
-                    print(f"[request] {self.username} Request {thread.username} for private connection.")
+                    if server_print : print(f"[request] {self.username} Request {thread.username} for private connection.")
+                    
                     # anouncement for start private request
                     startprivate_announcement = ServerMessage(f"{self.username} would like to private message.", ServerMessageType.ANNONCEMENT)
                     thread.clientSocket.send(pickle.dumps(startprivate_announcement))
@@ -613,8 +619,8 @@ class ClientThread(Thread):
                     
                     return
         # cannot find target user in thread_list, return target offline error
-        print(f"[Error] Cannot send request to {target_user}, target user is offline.")
-        offline_error_message = ServerMessage(f"{target_user} is currenly offline.", ServerMessageType.ERROR)
+        if server_print : print(f"[Error] Cannot send request to '{target_user}', target user is offline.")
+        offline_error_message = ServerMessage(f"'{target_user}'' is currenly offline.", ServerMessageType.ERROR)
         self.clientSocket.send(pickle.dumps(offline_error_message))
 
         return
@@ -629,8 +635,8 @@ class ClientThread(Thread):
                     thread.clientSocket.send(pickle.dumps(stopprivate_message))
                     return
         # can not execute the stopprivate from requester
-        print(f"[Error] : Can not execute the stopprivate from requester.")
-        error_message_content = f"Stop private messaging with {target_user} can not be executed."
+        if server_print : print(f"[Error] : Can not execute the stopprivate from requester.")
+        error_message_content = f"Stop private messaging with '{target_user}' can not be executed."
         error_message = ServerMessage(error_message_content, ServerMessageType.ERROR)
         self.clientSocket.send(pickle.dumps(error_message))
         return
@@ -650,8 +656,8 @@ class ClientThread(Thread):
         return
     
     
-print("\n===== Server is running =====")
-print("===== Waiting for connection request from clients...=====")
+if server_print : print("\n===== Server is running =====")
+if server_print : print("===== Waiting for connection request from clients...=====")
 
 
 while True:

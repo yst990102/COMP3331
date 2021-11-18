@@ -127,7 +127,7 @@ class SendThread(Thread):
                         del requester_list[0]
                     elif self.message_type == MessageType.NO:
                         print(f"You refused the request.")
-                        refused_message = Message(self.message_content, MessageType.NO)
+                        refused_message = Message({"requester" : requester_list[0]}, MessageType.NO)
                         self.clientSocket.send(pickle.dumps(refused_message))
                         
                         # remove the confirmed requester
@@ -218,7 +218,9 @@ class SendThread(Thread):
                     else:
                         print(f"=== Error : Stop Private messaging with {target_user} not enabled. Target logged out or No private tunnel setup.")
                     continue
-
+                elif self.message_type == MessageType.ARGUMENT_ERROR:
+                    print("=== Error : Argument Error ===")
+                    continue
 class ReceiveThread(Thread):
     def __init__(self, clientSocket:socket):
         Thread.__init__(self)
