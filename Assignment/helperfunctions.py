@@ -6,6 +6,8 @@ def LoadUserData(filename):
     UserDataFile = open(filename, 'r')
     UserData = {}
     for DataLine in UserDataFile:
+        if len(DataLine.split(" ")) != 2:
+            continue
         [username, password] = DataLine.split(" ")
         password = password.replace('\n', '')
         UserData.update({username:password})

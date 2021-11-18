@@ -200,6 +200,7 @@ class ClientThread(Thread):
                             if self.username not in blocker_list[thread.username]:      # only when you are not in that user's block list
                                 ask_message = ServerMessage({"requester":self.username, "private_address":requester_socket_address}, ServerMessageType.SETUP_PRIVATE_SENDERTHREAD)
                                 thread.clientSocket.sendall(pickle.dumps(ask_message))
+                                break
                         
     """
         You can create more customized APIs here, e.g., logic for processing user authentication
@@ -465,6 +466,7 @@ class ClientThread(Thread):
         for (username, login_time) in OnLine_list:
             if username != self.username:
                 if self.username not in blocker_list[username]:     # only when you are not in that user's block list
+                    time.sleep(0.01)
                     whoelse_messge = ServerMessage(username, ServerMessageType.ANNONCEMENT)
                     self.clientSocket.sendall(pickle.dumps(whoelse_messge))
         return
@@ -488,6 +490,7 @@ class ClientThread(Thread):
         suitable_users = list(set(suitable_users))
         for username  in suitable_users:
             if self.username not in blocker_list[username]:     # only when you are not in that user's block list
+                time.sleep(0.01)
                 whoelse_messge = ServerMessage(username, ServerMessageType.ANNONCEMENT)
                 self.clientSocket.sendall(pickle.dumps(whoelse_messge))
         return
