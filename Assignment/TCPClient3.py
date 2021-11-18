@@ -68,6 +68,9 @@ class PrivateReceiveThread(Thread):
             
     def getSocket(self):
         return self.private_socket
+
+    def endSocket(self):
+        self.private_socket.close()
             
         
 class PrivateSendThread(Thread):
@@ -84,6 +87,9 @@ class PrivateSendThread(Thread):
         
     def getSocket(self):
         return self.private_socket
+    
+    def endSocket(self):
+        self.private_socket.close()
 
 class SendThread(Thread):
     def __init__(self, clientSocket:socket):
@@ -210,9 +216,13 @@ class SendThread(Thread):
                 elif self.message_type == MessageType.STOPPRIVATE:
                     target_user = self.message_content['user']
                     if target_user in private_receive_thread_list.keys() and target_user in private_send_thread_list.keys():
+                        # end sockets
+                        private_receive_thread_list[target_user].endSocket()
+                        private_send_thread_list[target_user].endSocket()
+                        # delete from thread_list
                         del private_receive_thread_list[target_user]
                         del private_send_thread_list[target_user]
-                        # TODO : send message to target user to let him stop private messaging
+                        # send message to target user to let him stop private messaging
                         stopprivate_message_content = {"deluser" : username, "user" : target_user}
                         stopprivate_message = Message(stopprivate_message_content, MessageType.STOPPRIVATE)
                         self.clientSocket.sendall(pickle.dumps(stopprivate_message))
