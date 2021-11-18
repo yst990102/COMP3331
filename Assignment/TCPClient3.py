@@ -97,7 +97,6 @@ class SendThread(Thread):
         global username
         global password
         global confirm_wait
-        global private_thread_list
         
         while self.Alive:
 

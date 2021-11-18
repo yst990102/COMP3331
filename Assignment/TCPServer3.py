@@ -49,11 +49,11 @@ UserData = LoadUserData('credentials.txt')
 OnLine_list = []
 
 # loghistory will be similar to online_list, but will not remove user when they logout
-# loghistory format : [{user: login_time_of_user}, ...]
+# loghistory format : [(user: login_time_of_user), ...]
 Log_history = []
 
 # login_blocked_list have all the users that be banned from login
-# login_blocked_list format : [{username : timerThread}, ...]
+# login_blocked_list format : [(username : timerThread), ...]
 login_blocked_list = []
 
 # clientThread_list has all the Client Thread that running
