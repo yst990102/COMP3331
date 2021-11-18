@@ -11,7 +11,6 @@ class TimeThread(Thread):
             # print("account blocked remaining == ",self.block_duration)
             self.block_duration -= 1
             sleep(1)
-            if self.block_duration == 0: break
 
 if __name__ == "__main__":
     testthread = TimeThread(5)
