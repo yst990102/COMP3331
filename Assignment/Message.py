@@ -40,6 +40,8 @@ class ServerMessageType(Enum):
     
     STOP_AND_DELETE_PRIVATE = 109
     STOPPED_PRIVATE_CONFIRM = 110
+    
+    LOGOUT_ANNOUNCEMENT = 111
 
 
 class Message(object):

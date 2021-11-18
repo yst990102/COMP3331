@@ -70,13 +70,23 @@ class SendThread(Thread):
                 clientSocket.send(pickle.dumps(username_message))                    # send out username
                 continue
             elif password == None:
+                if message_received.getType() == ServerMessageType.REQUEST_NEEDPASSWORD:
+                    password = input(message_received.getContent() + "Password: ")
+                    password_message = Message({"password":password}, MessageType.LOGIN_PASSWD)
+                    clientSocket.send(pickle.dumps(password_message))                    # send out password
+                    continue
+                elif message_received.getType() == ServerMessageType.REQUEST_NEWUSER:
+                    password = input(message_received.getContent() + "Enter a password: ")
+                    password_message = Message({"newpassword":password}, MessageType.LOGIN_NEWPASSWD)
+                    clientSocket.send(pickle.dumps(password_message))                    # send out password
+                    continue
                 continue
             else:
                 message_send = input()
                 [self.message_content, self.message_type] = MessageContentByType(message_send)
                 
                 if confirm_wait == True and requester_list != []:
-                    print("confirm_wait == ", confirm_wait," , requester_list ==" , requester_list)
+                    if debug : print("confirm_wait == ", confirm_wait," , requester_list ==" , requester_list)
                     if message_send in ['y', 'n']:
                         if self.message_type == MessageType.YES:
                             # create a private socket
@@ -100,11 +110,14 @@ class SendThread(Thread):
                             refused_message = Message(self.message_content, MessageType.NO)
                             self.clientSocket.send(pickle.dumps(refused_message))
                             
+                            # remove the confirmed requester
+                            del requester_list[0]
+                            
                         if requester_list == []:
                             confirm_wait = False
                         continue
                     else:
-                        print("=== Error : Please enter y or n: ")
+                        print("Please enter y or n: ")
                         continue
                 else:
                     if self.message_type == MessageType.NOCOMMAND or self.message_type == MessageType.YES or self.message_type == MessageType.NO:
@@ -167,7 +180,10 @@ class SendThread(Thread):
                             send_thread = private_send_thread_list[target_user]
                             send_thread.sendmessage(message)
                         else:
-                            print(f"=== Error : Private messaging to {target_user} not enabled.")
+                            if target_user == username:
+                                print(f"=== Error : You can't private message to yourself.")
+                            else:
+                                print(f"=== Error : Private messaging to {target_user} not enabled.")
                         continue
                     elif self.message_type == MessageType.STOPPRIVATE:
                         target_user = self.message_content['user']
@@ -180,7 +196,7 @@ class SendThread(Thread):
                             self.clientSocket.send(pickle.dumps(stopprivate_message))
                             continue
                         else:
-                            print(f"=== Error : Stop Private messaging to {target_user} not enabled.")
+                            print(f"=== Error : Stop Private messaging with {target_user} not enabled. Target logged out or No private tunnel setup.")
                         continue
 
 class ReceiveThread(Thread):
@@ -199,28 +215,21 @@ class ReceiveThread(Thread):
             data = self.clientSocket.recv(1024)
             message_received = pickle.loads(data)
             
-            if message_received.getType() == ServerMessageType.REQUEST_NEEDPASSWORD:
-                password = input(message_received.getContent() + "Password: ")
-                password_message = Message({"password":password}, MessageType.LOGIN_PASSWD)
-                clientSocket.send(pickle.dumps(password_message))                    # send out password
-                continue
-            elif message_received.getType() == ServerMessageType.REQUEST_NEWUSER:
-                password = input(message_received.getContent() + "Enter a password: ")
-                password_message = Message({"newpassword":password}, MessageType.LOGIN_NEWPASSWD)
-                clientSocket.send(pickle.dumps(password_message))                    # send out password
-                continue
-            elif message_received.getType() == ServerMessageType.ANNONCEMENT:
+            if message_received.getType() == ServerMessageType.ANNONCEMENT:
                 # print the announcement from server
                 print(message_received.getContent())
                 continue
+            elif message_received.getType() == ServerMessageType.LOGOUT_ANNOUNCEMENT:
+                # print the logout announcement from server
+                logout_user = message_received.getContent()['logout_user']
+                # remove private tunnel with logout_user
+                if logout_user in private_receive_thread_list.keys() and logout_user in private_send_thread_list.keys():
+                    del private_receive_thread_list[logout_user]
+                    del private_send_thread_list[logout_user]
+                print(f"{logout_user} logged out.")
+                continue
             elif message_received.getType() == ServerMessageType.TIMEOUT:
                 # print timeout message & terminate client
-                print(message_received.getContent())
-                # turn off socket & exit
-                self.clientSocket.close()
-                os._exit(0)
-            elif message_received.getType() == ServerMessageType.ACCOUNT_BLOCK:
-                # print account blocked message & terminate client
                 print(message_received.getContent())
                 # turn off socket & exit
                 self.clientSocket.close()
@@ -229,10 +238,6 @@ class ReceiveThread(Thread):
                 # print error message
                 error_message = f"=== Error : {message_received.getContent()} ==="
                 print(error_message)
-                
-                if "already online" in message_received.getContent():
-                    print("Please re-type your Username")
-                    username = None
                 continue
             elif message_received.getType() == ServerMessageType.ASK_FOR_PRIVATE_CONNECTION:
                 print("enter y or n: ")
@@ -295,4 +300,35 @@ sendthread = SendThread(clientSocket)
 
 # start receiving : may have login timeout
 receivethread.start()
+
+username = input("Username: ")
+username_message = Message({'username' : username}, MessageType.LOGIN_USERNAME)
+clientSocket.send(pickle.dumps(username_message))
+
+while True:
+    
+    data = clientSocket.recv(1024)
+    message_received = pickle.loads(data)
+    
+    if message_received.getType() == ServerMessageType.REQUEST_NEEDPASSWORD:
+        password = input(message_received.getContent() + "Password: ")
+        password_message = Message({"password":password}, MessageType.LOGIN_PASSWD)
+        clientSocket.send(pickle.dumps(password_message))                    # send out password
+        continue
+    elif message_received.getType() == ServerMessageType.REQUEST_NEWUSER:
+        password = input(message_received.getContent() + "Enter a password: ")
+        password_message = Message({"newpassword":password}, MessageType.LOGIN_NEWPASSWD)
+        clientSocket.send(pickle.dumps(password_message))                    # send out password
+        break
+    elif message_received.getType() == ServerMessageType.ERROR:
+        username = input()
+        print(message_received.getContent())
+        continue
+    elif message_received.getType() == ServerMessageType.ACCOUNT_BLOCK:
+        print(message_received.getContent())
+        os._exit(0)
+    elif message_received.getType() == ServerMessageType.ANNONCEMENT:
+        print(message_received.getContent())
+        break
+    
 sendthread.start()
