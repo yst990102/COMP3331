@@ -173,6 +173,7 @@ class ClientThread(Thread):
                             confirmed_feedback = ServerMessage(f"{self.username} has confirmed your request.", ServerMessageType.ANNONCEMENT)
                             thread.clientSocket.sendall(pickle.dumps(confirmed_feedback))
                             
+                            time.sleep(0.01)
                             # send feedback to requester
                             requester_feedback = ServerMessage({"target_user": self.username, "private_address":self.message_content['private_address']}, ServerMessageType.SEND_REQUESTER_SOCKET_ADDRESS)
                             thread.clientSocket.sendall(pickle.dumps(requester_feedback))
@@ -214,8 +215,11 @@ class ClientThread(Thread):
         # if user is already online
         is_user_online = False
         for user in OnLine_list[:]:
+            print(f"== check == {user[0]} -- {self.username} ")
             if user[0] == self.username:
                 # user is already online
+                if server_print : print("[Error] : User is already online.")
+                time.sleep(0.01)
                 online_error = ServerMessage(f"{self.username} is already online.", ServerMessageType.ERROR)
                 self.clientSocket.sendall(pickle.dumps(online_error))
                 is_user_online = True

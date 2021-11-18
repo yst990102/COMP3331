@@ -10,6 +10,7 @@ import os
 from socket import *
 import sys
 import pickle
+import time
 
 from Message import Message, MessageType, ServerMessageType
 from helperfunctions import MessageContentByType
@@ -117,6 +118,8 @@ class SendThread(Thread):
                         private_socket = socket(AF_INET, SOCK_STREAM)
                         private_receive_thread = PrivateReceiveThread(private_socket)
                         private_receive_thread.start()
+                        
+                        time.sleep(0.01)
                         
                         # add private thread in to private_receive_thread_list
                         private_receive_thread_list.update({requester_list[0] : private_receive_thread})
@@ -295,6 +298,7 @@ class ReceiveThread(Thread):
                 private_send_thread_list.update({message_received.getContent()['target_user'] : private_send_thread})
                 private_receive_thread_list.update({message_received.getContent()['target_user'] : private_receive_thread})
 
+                time.sleep(0.01)
                 ask_target_start_private_sender_thread_message = Message({"target_user" : message_received.getContent()['target_user'], "private_address":requester_socket_receive.getsockname()}, MessageType.TELL_TARGET_USER_SETUP_PRIVATE_SENDERTHREAD)
                 self.clientSocket.sendall(pickle.dumps(ask_target_start_private_sender_thread_message))
                 continue
@@ -352,8 +356,10 @@ while True:
         clientSocket.sendall(pickle.dumps(password_message))                    # send out password
         break
     elif message_received.getType() == ServerMessageType.ERROR:
-        username = input()
         print(message_received.getContent())
+        username = input("Please re-type your username :")
+        username_message = Message({'username' : username}, MessageType.LOGIN_USERNAME)
+        clientSocket.sendall(pickle.dumps(username_message))
         continue
     elif message_received.getType() == ServerMessageType.ACCOUNT_BLOCK:
         print(message_received.getContent())
