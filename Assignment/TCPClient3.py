@@ -321,9 +321,6 @@ class ReceiveThread(Thread):
 receivethread = ReceiveThread(clientSocket)
 sendthread = SendThread(clientSocket)
 
-# start receiving : may have login timeout
-receivethread.start()
-
 username = input("Username: ")
 username_message = Message({'username' : username}, MessageType.LOGIN_USERNAME)
 clientSocket.sendall(pickle.dumps(username_message))
@@ -353,5 +350,7 @@ while True:
     elif message_received.getType() == ServerMessageType.ANNONCEMENT:
         print(message_received.getContent())
         break
-    
+
+# start receiving : may have login timeout
+receivethread.start()
 sendthread.start()

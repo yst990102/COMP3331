@@ -34,6 +34,9 @@ def MessageContentByType(input_message:str):
     input_list = input_message.split(" ")
     input_list = list(filter(None, input_list)) # remove none and empty string in list
     
+    if len(input_list) < 1:
+        return [{}, MessageType.ARGUMENT_ERROR]
+    
     message_type = StringToMessageType(input_list[0])
     
     if message_type == MessageType.MESSAGE:
