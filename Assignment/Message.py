@@ -1,3 +1,4 @@
+# !/usr/bin/python3
 from enum import Enum
 
 class MessageType(Enum):

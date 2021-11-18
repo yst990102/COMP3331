@@ -1,3 +1,4 @@
+# !/usr/bin/python3
 """
     Code for Multi-Threaded Server
     Python 3
@@ -76,7 +77,7 @@ stored_message_list = InitializeStoredMessageList(UserData)
 """
 class ClientThread(Thread):
     
-    def __init__(self, clientAddress, clientSocket:socket):
+    def __init__(self, clientAddress, clientSocket):
         global UserData, OnLine_list, Log_history, login_blocked_list, clientThread_list, blocker_list, stored_message_list
         
         Thread.__init__(self)

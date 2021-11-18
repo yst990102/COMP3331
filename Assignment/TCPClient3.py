@@ -1,9 +1,10 @@
+# !/usr/bin/python3
 """
     Python 3
     Usage: python3 TCPClient3.py server_port
     coding: utf-8
     
-    Author: Wei Song (Tutor for COMP3331/9331)
+    Author: z5192519
 """
 import os
 from socket import *
