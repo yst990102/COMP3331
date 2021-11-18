@@ -30,7 +30,7 @@ if len(sys.argv) != 4:
     print(len(sys.argv))
     print("\n===== Error usage. Please follow format: (python3 TCPserver3.py server_port block_duration timeout) ======\n")
     exit(0)
-serverHost = "127.0.0.1"
+serverHost = "localhost"
 serverPort = int(sys.argv[1])
 block_duration = int(sys.argv[2])
 timeout_duration = int(sys.argv[3])
